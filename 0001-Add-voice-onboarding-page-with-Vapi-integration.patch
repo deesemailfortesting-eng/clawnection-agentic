@@ -1,0 +1,582 @@
+From 5262f6894dd72743f657afd386d7880d0cd9b7c4 Mon Sep 17 00:00:00 2001
+From: Sravani Royyuru <sravaniroyyuru@Sravanis-MacBook-Air.local>
+Date: Sun, 26 Apr 2026 13:33:48 -0400
+Subject: [PATCH] Add voice onboarding page with Vapi integration
+
+- Add new /voice-onboarding route with voice-based profile creation
+- Integrate @vapi-ai/web SDK for conversational AI assistant
+- Add voice onboarding button to homepage
+- Create setup documentation and environment variable template
+- Assistant collects comprehensive profile data via natural speech
+- Maintains same data structure as text onboarding form
+---
+ VOICE_ONBOARDING_README.md    |  60 ++++++++
+ app/page.tsx                  |   3 +
+ app/voice-onboarding/page.tsx | 260 ++++++++++++++++++++++++++++++++++
+ package-lock.json             | 138 ++++++++++++++++++
+ package.json                  |   1 +
+ 5 files changed, 462 insertions(+)
+ create mode 100644 VOICE_ONBOARDING_README.md
+ create mode 100644 app/voice-onboarding/page.tsx
+
+diff --git a/VOICE_ONBOARDING_README.md b/VOICE_ONBOARDING_README.md
+new file mode 100644
+index 0000000..df32700
+--- /dev/null
++++ b/VOICE_ONBOARDING_README.md
+@@ -0,0 +1,60 @@
++# Voice Onboarding Integration
++
++This page integrates Vapi for voice-based user onboarding in the Clawnection app.
++
++## Setup Instructions
++
++1. **Install Vapi SDK** (already done):
++   ```bash
++   npm install @vapi-ai/web
++   ```
++
++2. **Get Vapi API Key**:
++   - Sign up at [Vapi.ai](https://vapi.ai)
++   - Create an API key in your dashboard
++
++3. **Get 11Labs Voice ID** (for voice synthesis):
++   - Sign up at [11Labs](https://elevenlabs.io)
++   - Create a voice and get the voice ID
++
++4. **Set Environment Variables**:
++   Create a `.env.local` file in the project root:
++   ```
++   NEXT_PUBLIC_VAPI_API_KEY=your_actual_vapi_api_key
++   NEXT_PUBLIC_VAPI_VOICE_ID=your_11labs_voice_id
++   ```
++
++5. **Restart the development server**:
++   ```bash
++   npm run dev
++   ```
++
++## How It Works
++
++- Users click "Start Voice Onboarding" to begin a voice call
++- The Vapi assistant asks conversational questions to collect profile information
++- After collecting all data, the assistant outputs a JSON summary
++- The profile is saved to localStorage and user is redirected to the demo
++
++## Features
++
++- Conversational onboarding experience
++- Collects all the same information as the text form
++- Error handling and call management
++- Fallback to text onboarding
++
++## Current Status
++
++- ✅ Page created and integrated
++- ✅ Vapi SDK installed
++- ✅ Basic conversation flow implemented
++- ⚠️ Requires API keys to function
++- ⚠️ Data extraction uses simple JSON parsing (could be improved with better NLP)
++
++## Next Steps
++
++1. Set up Vapi account and get API keys
++2. Test the voice interaction
++3. Improve data extraction (perhaps use Vapi's structured conversation features)
++4. Add more sophisticated error handling
++5. Consider adding voice recording/transcription fallbacks
+\ No newline at end of file
+diff --git a/app/page.tsx b/app/page.tsx
+index ef34054..ab28c60 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -35,6 +35,9 @@ export default function HomePage() {
+             <Link href="/onboarding" className="rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700">
+               Create My Profile
+             </Link>
++            <Link href="/voice-onboarding" className="rounded-xl border border-rose-300 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100">
++              Voice Onboarding (Beta)
++            </Link>
+             <Link href="/demo" className="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-900">
+               Try Demo Match
+             </Link>
+diff --git a/app/voice-onboarding/page.tsx b/app/voice-onboarding/page.tsx
+new file mode 100644
+index 0000000..c3d00c1
+--- /dev/null
++++ b/app/voice-onboarding/page.tsx
+@@ -0,0 +1,260 @@
++"use client";
++
++import { useEffect, useRef, useState } from "react";
++import { useRouter } from "next/navigation";
++import Vapi from "@vapi-ai/web";
++import { saveProfile } from "@/lib/storage";
++import { CommunicationStyle, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
++
++type ProfileData = {
++  name?: string;
++  age?: number;
++  genderIdentity?: string;
++  lookingFor?: string;
++  location?: string;
++  relationshipIntent?: RelationshipIntent;
++  bio?: string;
++  interests?: string[];
++  values?: string[];
++  communicationStyle?: CommunicationStyle;
++  sleepSchedule?: RomanticProfile["lifestyleHabits"]["sleepSchedule"];
++  socialEnergy?: RomanticProfile["lifestyleHabits"]["socialEnergy"];
++  activityLevel?: RomanticProfile["lifestyleHabits"]["activityLevel"];
++  drinking?: RomanticProfile["lifestyleHabits"]["drinking"];
++  smoking?: RomanticProfile["lifestyleHabits"]["smoking"];
++  dealbreakers?: string[];
++  idealFirstDate?: string;
++  preferenceMinAge?: number;
++  preferenceMaxAge?: number;
++  preferenceNotes?: string;
++  agentType?: RomanticProfile["agentType"];
++};
++
++export default function VoiceOnboardingPage() {
++  const router = useRouter();
++  const vapiRef = useRef<Vapi | null>(null);
++  const [isCallActive, setIsCallActive] = useState(false);
++  const [profile, setProfile] = useState<ProfileData>({});
++  const [isComplete, setIsComplete] = useState(false);
++
++  useEffect(() => {
++    // Initialize Vapi
++    const apiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
++    if (!apiKey) {
++      console.error("VAPI_API_KEY not found. Please set NEXT_PUBLIC_VAPI_API_KEY in your environment variables.");
++      return;
++    }
++
++    vapiRef.current = new Vapi(apiKey);
++
++    // Set up event listeners
++    const vapi = vapiRef.current;
++
++    vapi.on("call-start", () => {
++      setIsCallActive(true);
++    });
++
++    vapi.on("call-end", () => {
++      setIsCallActive(false);
++      // Process the collected data and save profile
++      processAndSaveProfile();
++    });
++
++    vapi.on("message", (message: any) => {
++      // Handle messages to extract profile data
++      extractProfileData(message);
++    });
++
++    vapi.on("error", (error: any) => {
++      console.error("Vapi error:", error);
++      setIsCallActive(false);
++    });
++
++    return () => {
++      vapi.stop();
++    };
++  }, []);
++
++  const extractProfileData = (message: any) => {
++    const text = message.text || "";
++    // Look for the JSON summary from the assistant
++    const jsonMatch = text.match(/PROFILE_DATA:\s*(\{.*\})/);
++    if (jsonMatch) {
++      try {
++        const data = JSON.parse(jsonMatch[1]);
++        setProfile(data);
++      } catch (error) {
++        console.error("Failed to parse profile data:", error);
++      }
++    }
++  };
++
++  const processAndSaveProfile = () => {
++    // Validate and save the profile
++    if (profile.name && profile.age && profile.location && profile.bio) {
++      const romanticProfile: RomanticProfile = {
++        id: `voice-${profile.name.toLowerCase().replace(/\s+/g, "-")}`,
++        name: profile.name,
++        age: profile.age,
++        genderIdentity: profile.genderIdentity || "",
++        lookingFor: profile.lookingFor || "",
++        location: profile.location,
++        relationshipIntent: profile.relationshipIntent || "long-term",
++        bio: profile.bio,
++        interests: profile.interests || [],
++        values: profile.values || [],
++        communicationStyle: profile.communicationStyle || "balanced",
++        lifestyleHabits: {
++          sleepSchedule: profile.sleepSchedule || "flexible",
++          socialEnergy: profile.socialEnergy || "balanced",
++          activityLevel: profile.activityLevel || "active",
++          drinking: profile.drinking || "social",
++          smoking: profile.smoking || "never",
++        },
++        dealbreakers: profile.dealbreakers || [],
++        idealFirstDate: profile.idealFirstDate || "",
++        preferenceAgeRange: {
++          min: profile.preferenceMinAge || 24,
++          max: profile.preferenceMaxAge || 38,
++        },
++        preferenceNotes: profile.preferenceNotes || "",
++        agentType: profile.agentType || "hosted",
++      };
++
++      saveProfile(romanticProfile);
++      setIsComplete(true);
++      setTimeout(() => router.push("/demo"), 2000);
++    }
++  };
++
++  const startVoiceOnboarding = async () => {
++    if (!vapiRef.current) return;
++
++    const assistant = {
++      name: "Clawnection Onboarding Assistant",
++      model: {
++        provider: "openai" as const,
++        model: "gpt-4" as const,
++        temperature: 0.7,
++      },
++      voice: {
++        provider: "11labs" as const,
++        voiceId: process.env.NEXT_PUBLIC_VAPI_VOICE_ID || "default-voice-id",
++      },
++      systemMessage: `You are a friendly onboarding assistant for Clawnection, an agentic matchmaking app.
++
++Your task is to help users create their romantic profile by asking questions conversationally.
++
++Ask for the following information in a natural order:
++1. Name
++2. Age
++3. Gender identity
++4. What they're looking for
++5. Location
++6. Relationship intent (long-term, serious dating, exploring, friendship first)
++7. Short bio
++8. Interests (comma-separated)
++9. Values (comma-separated)
++10. Communication style (balanced, direct, warm, playful, reflective)
++11. Lifestyle: sleep schedule (early-bird, flexible, night-owl)
++12. Social energy (low-key, balanced, high-energy)
++13. Activity level (relaxed, active, very-active)
++14. Drinking habits (never, social, regular)
++15. Smoking habits (never, occasionally, regular)
++16. Dealbreakers (comma-separated)
++17. Ideal first date
++18. Preferred age range (min and max)
++19. Any additional preference notes
++20. Agent type preference (hosted or external)
++
++Be conversational and friendly. Confirm information and ask for clarification if needed.
++Once all information is collected, summarize and ask if they want to proceed.
++
++IMPORTANT: After collecting all information, output a JSON summary of the profile data in this exact format:
++PROFILE_DATA: {"name": "...", "age": 25, ...}
++
++Make sure to include all collected fields in the JSON.`,
++    };
++
++    try {
++      await vapiRef.current.start(assistant);
++    } catch (error) {
++      console.error("Failed to start voice onboarding:", error);
++    }
++  };
++
++  const stopCall = () => {
++    if (vapiRef.current) {
++      vapiRef.current.stop();
++    }
++  };
++
++  return (
++    <main className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-white px-6 py-10">
++      <div className="mx-auto max-w-2xl space-y-6">
++        <header className="space-y-3">
++          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Voice Onboarding</p>
++          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">Build your romance profile with voice</h1>
++          <p className="max-w-2xl text-sm leading-6 text-zinc-600">
++            Chat with our AI assistant to create your profile. Just speak naturally - we'll guide you through everything.
++          </p>
++        </header>
++
++        <div className="rounded-xl border border-zinc-200 bg-white p-6">
++          {!isCallActive && !isComplete && (
++            <div className="text-center space-y-4">
++              <p className="text-sm text-zinc-600">
++                Ready to get started? Click the button below to begin your voice onboarding session.
++              </p>
++              <button
++                onClick={startVoiceOnboarding}
++                className="rounded-xl bg-rose-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-600"
++              >
++                Start Voice Onboarding
++              </button>
++            </div>
++          )}
++
++          {isCallActive && (
++            <div className="text-center space-y-4">
++              <div className="inline-flex items-center space-x-2">
++                <div className="h-3 w-3 animate-pulse rounded-full bg-green-500"></div>
++                <p className="text-sm font-medium text-zinc-900">Call in progress</p>
++              </div>
++              <p className="text-sm text-zinc-600">
++                Speak naturally with our assistant. We'll collect your profile information through conversation.
++              </p>
++              <button
++                onClick={stopCall}
++                className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-300"
++              >
++                End Call
++              </button>
++            </div>
++          )}
++
++          {isComplete && (
++            <div className="text-center space-y-4">
++              <div className="inline-flex items-center space-x-2">
++                <div className="h-3 w-3 rounded-full bg-green-500"></div>
++                <p className="text-sm font-medium text-zinc-900">Profile created successfully!</p>
++              </div>
++              <p className="text-sm text-zinc-600">
++                Redirecting you to the demo in a moment...
++              </p>
++            </div>
++          )}
++        </div>
++
++        <div className="text-center">
++          <p className="text-xs text-zinc-500">
++            Prefer to fill out the form manually?{" "}
++            <a href="/onboarding" className="text-rose-500 hover:text-rose-600">
++              Go to text onboarding
++            </a>
++          </p>
++        </div>
++      </div>
++    </main>
++  );
++}
+\ No newline at end of file
+diff --git a/package-lock.json b/package-lock.json
+index c29bd47..62a15d3 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -8,6 +8,7 @@
+       "name": "clawnection",
+       "version": "0.1.0",
+       "dependencies": {
++        "@vapi-ai/web": "^2.5.2",
+         "next": "16.2.3",
+         "react": "19.2.4",
+         "react-dom": "19.2.4"
+@@ -228,6 +229,15 @@
+         "node": ">=6.0.0"
+       }
+     },
++    "node_modules/@babel/runtime": {
++      "version": "7.29.2",
++      "resolved": "https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.2.tgz",
++      "integrity": "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=6.9.0"
++      }
++    },
+     "node_modules/@babel/template": {
+       "version": "7.28.6",
+       "resolved": "https://registry.npmjs.org/@babel/template/-/template-7.28.6.tgz",
+@@ -276,6 +286,22 @@
+         "node": ">=6.9.0"
+       }
+     },
++    "node_modules/@daily-co/daily-js": {
++      "version": "0.85.0",
++      "resolved": "https://registry.npmjs.org/@daily-co/daily-js/-/daily-js-0.85.0.tgz",
++      "integrity": "sha512-lpl111ZWNTUWDnwYcPuNi9PGJPbLCeCw6LzmEY40nG0hv1jg5JLVW8Rq3Cj/+lOCP6W6h4PXm211ss0FFnxITQ==",
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "@babel/runtime": "^7.12.5",
++        "@sentry/browser": "^8.33.1",
++        "bowser": "^2.8.1",
++        "dequal": "^2.0.3",
++        "events": "^3.1.0"
++      },
++      "engines": {
++        "node": ">=10.0.0"
++      }
++    },
+     "node_modules/@emnapi/core": {
+       "version": "1.9.2",
+       "resolved": "https://registry.npmjs.org/@emnapi/core/-/core-1.9.2.tgz",
+@@ -1233,6 +1259,81 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/@sentry-internal/browser-utils": {
++      "version": "8.55.1",
++      "resolved": "https://registry.npmjs.org/@sentry-internal/browser-utils/-/browser-utils-8.55.1.tgz",
++      "integrity": "sha512-SipXiwVhJrxzy3/4kf+YIFmpYlLKtGSRD+er7SBCcuSBtv31Fee8IXMDvk+bq24gRXxyjOLUmT//GGXjy2LL6w==",
++      "license": "MIT",
++      "dependencies": {
++        "@sentry/core": "8.55.1"
++      },
++      "engines": {
++        "node": ">=14.18"
++      }
++    },
++    "node_modules/@sentry-internal/feedback": {
++      "version": "8.55.1",
++      "resolved": "https://registry.npmjs.org/@sentry-internal/feedback/-/feedback-8.55.1.tgz",
++      "integrity": "sha512-9iFHaT/ijtzB0ffZhXMnt2rPNIXO/dDiCL1G1Bc55rQMPXgawR9AIaAWciyqQjYcbL1DDOhWbzdVqB+kVs5gXw==",
++      "license": "MIT",
++      "dependencies": {
++        "@sentry/core": "8.55.1"
++      },
++      "engines": {
++        "node": ">=14.18"
++      }
++    },
++    "node_modules/@sentry-internal/replay": {
++      "version": "8.55.1",
++      "resolved": "https://registry.npmjs.org/@sentry-internal/replay/-/replay-8.55.1.tgz",
++      "integrity": "sha512-XaX6r8pXeX47rfiQrSQUwkgxHsDkOKzIT++zfTwrmveVlYSqAhp3x+AKhxAXGmKG62wlmAKQz54GJKcG4cgyKQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@sentry-internal/browser-utils": "8.55.1",
++        "@sentry/core": "8.55.1"
++      },
++      "engines": {
++        "node": ">=14.18"
++      }
++    },
++    "node_modules/@sentry-internal/replay-canvas": {
++      "version": "8.55.1",
++      "resolved": "https://registry.npmjs.org/@sentry-internal/replay-canvas/-/replay-canvas-8.55.1.tgz",
++      "integrity": "sha512-2sKRu96Qe70y6TiYdYbwkhg4um2prgzH/ZJRItuoSEAjPjoFYYlP+1qjE2CcBw4RPS8/PimV7SFheSaeZs2GCw==",
++      "license": "MIT",
++      "dependencies": {
++        "@sentry-internal/replay": "8.55.1",
++        "@sentry/core": "8.55.1"
++      },
++      "engines": {
++        "node": ">=14.18"
++      }
++    },
++    "node_modules/@sentry/browser": {
++      "version": "8.55.1",
++      "resolved": "https://registry.npmjs.org/@sentry/browser/-/browser-8.55.1.tgz",
++      "integrity": "sha512-OEn2eg8h3Mr7BmBGQ28BqbWehYA/NklZ0pAZB1FypPPl+kMd85AbaRdGTnaSjgmpc8bKbBO64edq4Y14sbCs5w==",
++      "license": "MIT",
++      "dependencies": {
++        "@sentry-internal/browser-utils": "8.55.1",
++        "@sentry-internal/feedback": "8.55.1",
++        "@sentry-internal/replay": "8.55.1",
++        "@sentry-internal/replay-canvas": "8.55.1",
++        "@sentry/core": "8.55.1"
++      },
++      "engines": {
++        "node": ">=14.18"
++      }
++    },
++    "node_modules/@sentry/core": {
++      "version": "8.55.1",
++      "resolved": "https://registry.npmjs.org/@sentry/core/-/core-8.55.1.tgz",
++      "integrity": "sha512-0ea+yDOgaijR3ba2al1QZxY0bZ9MBZq2a0G+2A0uCBpBkiXnpLFGVAo9UAlEikN1C4M8ROZYiuFU7yZCqacgLQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=14.18"
++      }
++    },
+     "node_modules/@swc/helpers": {
+       "version": "0.5.15",
+       "resolved": "https://registry.npmjs.org/@swc/helpers/-/helpers-0.5.15.tgz",
+@@ -2139,6 +2240,19 @@
+         "win32"
+       ]
+     },
++    "node_modules/@vapi-ai/web": {
++      "version": "2.5.2",
++      "resolved": "https://registry.npmjs.org/@vapi-ai/web/-/web-2.5.2.tgz",
++      "integrity": "sha512-mT4DjApi0/0+EK77h2xOLq3qVBa7rv3JNQ+gFWuhFE4YdGYxI51+fn8bQI9N535+zU/Z4jFKXotdBHQJ3filHA==",
++      "license": "MIT",
++      "dependencies": {
++        "@daily-co/daily-js": "^0.85.0",
++        "events": "^3.3.0"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
+     "node_modules/acorn": {
+       "version": "8.16.0",
+       "resolved": "https://registry.npmjs.org/acorn/-/acorn-8.16.0.tgz",
+@@ -2444,6 +2558,12 @@
+         "node": ">=6.0.0"
+       }
+     },
++    "node_modules/bowser": {
++      "version": "2.14.1",
++      "resolved": "https://registry.npmjs.org/bowser/-/bowser-2.14.1.tgz",
++      "integrity": "sha512-tzPjzCxygAKWFOJP011oxFHs57HzIhOEracIgAePE4pqB3LikALKnSzUyU4MGs9/iCEUuHlAJTjTc5M+u7YEGg==",
++      "license": "MIT"
++    },
+     "node_modules/brace-expansion": {
+       "version": "1.1.14",
+       "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.14.tgz",
+@@ -2783,6 +2903,15 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
++    "node_modules/dequal": {
++      "version": "2.0.3",
++      "resolved": "https://registry.npmjs.org/dequal/-/dequal-2.0.3.tgz",
++      "integrity": "sha512-0je+qPKHEMohvfRTCEo3CrPG6cAzAYgmzKyxRiYSSDkS6eGJdyVJm7WaYA5ECaAD9wLB2T4EEeymA5aFVcYXCA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=6"
++      }
++    },
+     "node_modules/detect-libc": {
+       "version": "2.1.2",
+       "resolved": "https://registry.npmjs.org/detect-libc/-/detect-libc-2.1.2.tgz",
+@@ -3455,6 +3584,15 @@
+         "node": ">=0.10.0"
+       }
+     },
++    "node_modules/events": {
++      "version": "3.3.0",
++      "resolved": "https://registry.npmjs.org/events/-/events-3.3.0.tgz",
++      "integrity": "sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=0.8.x"
++      }
++    },
+     "node_modules/fast-deep-equal": {
+       "version": "3.1.3",
+       "resolved": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
+diff --git a/package.json b/package.json
+index 6781a93..b44b5e2 100644
+--- a/package.json
++++ b/package.json
+@@ -9,6 +9,7 @@
+     "lint": "eslint"
+   },
+   "dependencies": {
++    "@vapi-ai/web": "^2.5.2",
+     "next": "16.2.3",
+     "react": "19.2.4",
+     "react-dom": "19.2.4"
+-- 
+2.39.5 (Apple Git-154)
+

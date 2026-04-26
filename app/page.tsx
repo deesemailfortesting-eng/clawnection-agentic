@@ -35,6 +35,9 @@ export default function HomePage() {
             <Link href="/onboarding" className="rounded-xl bg-zinc-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700">
               Create My Profile
             </Link>
+            <Link href="/voice-onboarding" className="rounded-xl border border-rose-300 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100">
+              Voice Onboarding (Beta)
+            </Link>
             <Link href="/demo" className="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-800 transition hover:border-zinc-900">
               Try Demo Match
             </Link>
