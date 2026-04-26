@@ -316,6 +316,12 @@ export default function VoiceOnboardingPage() {
   }, [processAndSaveProfile]);
 
   async function startVoiceOnboarding() {
+    const validationError = validateCurrentStep();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     if (!vapiRef.current) {
       setError("Voice onboarding is not initialized. Check NEXT_PUBLIC_VAPI_API_KEY.");
       return;
@@ -343,43 +349,33 @@ export default function VoiceOnboardingPage() {
 
   return (
     <PhoneShell>
-      <main className="screen-padding space-y-6">
-        <header className="space-y-4">
-          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
-          <p className="pill w-fit">Voice onboarding</p>
-          <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">Build your profile by voice</h1>
-          <p className="text-sm leading-6 text-white/66">
-            Talk with the wtfradar assistant to create your dating profile. Every spoken instruction is also summarized on this screen.
-          </p>
+      <main className="flex h-dvh flex-col overflow-hidden px-[18px] pb-[calc(18px+var(--safe-bottom))] pt-[calc(16px+var(--safe-top))]">
+        <header className="shrink-0 space-y-3">
+          <nav aria-label="Voice onboarding" className="flex items-center justify-between gap-3">
+            <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
+            <span className="pill">
+              {isCallActive ? "Mic on" : isComplete ? "Done" : "Profile"}
+            </span>
+          </nav>
+          <div>
+            <h1 className="text-3xl font-black leading-none tracking-[-0.045em] text-white">Set up your profile</h1>
+            <p className="mt-2 text-sm leading-5 text-white/58">One step at a time.</p>
+          </div>
         </header>
 
         {error && (
-          <div role="alert" className="alert-message rounded-2xl px-4 py-3 text-sm">
+          <div role="alert" className="alert-message mt-4 shrink-0 rounded-2xl px-4 py-3 text-sm">
             {error}
           </div>
         )}
 
-        <section aria-labelledby="voice-status-title" className="obsidian-card rounded-[30px] p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 id="voice-status-title" className="text-xl font-black text-white">Microphone status</h2>
-              <p className="mt-1 text-sm leading-6 text-white/62">
-                {isCallActive ? "Your microphone is active for the onboarding call." : "Your microphone is off."}
-              </p>
-            </div>
-            <div
-              aria-hidden="true"
-              className={`mt-1 h-5 w-5 rounded-full ${isCallActive ? "animate-pulse bg-[var(--interactive)] shadow-[0_0_26px_rgba(216,191,65,0.55)]" : "bg-white/18"}`}
-            />
-          </div>
-          <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-white">
-            {isCallActive ? "Microphone active. The assistant can hear you now." : "Microphone inactive. Start the call when you are ready."}
-          </p>
-        </section>
+        <p role="status" aria-live="polite" className="sr-only">
+          {isCallActive ? "Microphone active. The assistant can hear you now." : "Microphone inactive."}
+        </p>
 
-        <section aria-labelledby="voice-flow-title" className="obsidian-card rounded-[30px] p-5">
+        <section aria-labelledby="voice-flow-title" className="obsidian-card mt-4 flex min-h-0 flex-1 flex-col justify-between rounded-[34px] p-5">
           {!isCallActive && !isComplete && (
-            <div className="space-y-6">
+            <div className="flex min-h-0 flex-1 flex-col justify-between gap-6">
               <div className="space-y-2">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-white/44">{currentStep.eyebrow}</p>
                 <h2 id="voice-flow-title" className="text-2xl font-black tracking-tight text-white">{currentStep.title}</h2>
@@ -483,42 +479,38 @@ export default function VoiceOnboardingPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={isLastBasicStep ? startVoiceOnboarding : goToNextBasicStep}
-                className="primary-button w-full"
-              >
-                {isLastBasicStep ? "Start voice bio" : "Continue"}
-              </button>
+              <div className="grid shrink-0 gap-3">
+                <button
+                  type="button"
+                  onClick={isLastBasicStep ? startVoiceOnboarding : goToNextBasicStep}
+                  className="primary-button w-full"
+                >
+                  {isLastBasicStep ? "Start voice bio" : "Continue"}
+                </button>
 
-              {currentStepIndex > 0 ? (
                 <button
                   type="button"
                   onClick={goToPreviousBasicStep}
-                  className="secondary-button w-full"
+                  className={`secondary-button w-full ${currentStepIndex === 0 ? "invisible" : ""}`}
+                  aria-hidden={currentStepIndex === 0}
+                  tabIndex={currentStepIndex === 0 ? -1 : undefined}
                 >
                   Back
                 </button>
-              ) : null}
-
-              <p className="text-center text-xs leading-5 text-white/50">
-                Voice starts after these basics. It only asks for your bio.
-              </p>
+              </div>
             </div>
           )}
 
           {isCallActive && (
-            <div className="space-y-5">
+            <div className="flex min-h-0 flex-1 flex-col justify-between gap-6">
               <div className="space-y-2">
-                <h2 id="voice-flow-title" className="text-xl font-black text-white">Call in progress</h2>
-                <p className="text-sm leading-6 text-white/66">
-                  Speak naturally. The assistant will only ask for a short bio.
-                </p>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-white/44">Final step</p>
+                <h2 id="voice-flow-title" className="text-2xl font-black tracking-tight text-white">Tell us about you</h2>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                <h3 className="text-sm font-black text-white">Visual equivalent of the audio prompt</h3>
+                <h3 className="text-sm font-black text-white">Voice prompt</h3>
                 <p className="mt-2 text-sm leading-6 text-white/62">
-                  Last step: share what you like to do, your hobbies, or what you are looking for.
+                  Share what you like to do, your hobbies, or what you are looking for.
                 </p>
               </div>
               <button
@@ -533,19 +525,14 @@ export default function VoiceOnboardingPage() {
           )}
 
           {isComplete && (
-            <div className="space-y-3 text-center">
-              <h2 id="voice-flow-title" className="text-xl font-black text-white">Profile saved</h2>
-              <p className="text-sm leading-6 text-white/66">Your profile is ready. Redirecting to the virtual date demo.</p>
+            <div className="grid flex-1 place-items-center text-center">
+              <div className="space-y-3">
+                <h2 id="voice-flow-title" className="text-2xl font-black text-white">Profile saved</h2>
+                <p className="text-sm leading-6 text-white/66">You are ready to go.</p>
+              </div>
             </div>
           )}
         </section>
-
-        <p className="text-center text-xs text-white/52">
-          Prefer to fill out the form manually?{" "}
-          <Link href="/onboarding" className="font-bold text-white underline underline-offset-4">
-            Open text onboarding
-          </Link>
-        </p>
       </main>
     </PhoneShell>
   );

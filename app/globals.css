@@ -330,7 +330,7 @@ select.field option {
 .apple-form-group {
   overflow: hidden;
   border: 1px solid var(--glass-stroke);
-  border-radius: calc(var(--content-radius) - 6px);
+  border-radius: 26px;
   background:
     linear-gradient(145deg, rgba(242, 201, 220, 0.12), rgba(242, 201, 220, 0.045)),
     rgba(63, 21, 37, 0.50);
@@ -339,7 +339,7 @@ select.field option {
 .apple-form-row {
   display: grid;
   gap: 0.45rem;
-  padding: 0.95rem;
+  padding: 0.8rem;
   border-bottom: 1px solid rgba(242, 201, 220, 0.12);
 }
 
@@ -379,6 +379,32 @@ select.field option {
 
 .apple-choice:active {
   transform: scale(0.98);
+}
+
+.onboarding-step-screen {
+  display: grid;
+  min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 1rem;
+  padding: calc(16px + var(--safe-top)) 18px calc(16px + var(--safe-bottom));
+}
+
+.onboarding-step-card {
+  align-self: center;
+}
+
+.onboarding-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(242, 201, 220, 0.12);
+}
+
+.onboarding-progress-value {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--interactive);
+  transition: width 180ms ease;
 }
 
 @media (prefers-contrast: more) {
