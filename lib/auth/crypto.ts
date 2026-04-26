@@ -1,24 +1,47 @@
 /*
  * Web Crypto helpers used by the envelope-encryption account system.
  *
+ * Algorithm: AES-GCM with a 256-bit key and a 128-bit auth tag for every
+ * symmetric operation in this module — wrapping the user DEK, encrypting
+ * user data, and (per spec) deriving 256 bits of password material via
+ * PBKDF2-SHA-256. AES-GCM provides authenticated encryption (AEAD): any
+ * tampering with the ciphertext, the auth tag, or the IV causes
+ * `subtle.decrypt` to throw, so callers never receive forged plaintext.
+ *
  * Only `crypto.subtle` is used — no Node `crypto` import — so this module is
  * safe to run on Cloudflare Workers / Pages / Vercel Edge Runtime.
  *
- *   Master KEK  (env secret, never in DB)
- *      │  wraps
- *      ▼
- *   User DEK   (per-user, generated at signup)
- *      │  encrypts
- *      ▼
+ *   Master KEK  (env secret, never in DB)         AES-GCM 256
+ *      │  wraps                                   12-byte IV
+ *      ▼                                          128-bit auth tag
+ *   User DEK   (per-user, generated at signup)    AES-GCM 256
+ *      │  encrypts                                12-byte IV
+ *      ▼                                          128-bit auth tag
  *   User data  (profile blobs, etc.)
  *
  * Every AES-GCM operation uses a fresh random 96-bit IV; IVs are never reused
- * for the same key. IVs are returned/stored separately from ciphertext (or
- * prepended via {@link packIvAndCipher} when persisting as a single blob).
+ * for the same key. IVs are stored alongside ciphertext (separate columns
+ * for the wrapped DEK; prepended into one base64 blob for user data via
+ * {@link packIvAndCipher}).
  */
 
-const AES_GCM_IV_BYTES = 12;
+// AES-GCM parameters — held in one place so wrap/unwrap and encrypt/decrypt
+// can never accidentally diverge. NIST SP 800-38D specifies a 12-byte
+// (96-bit) IV as the recommended length, and a 16-byte (128-bit) tag is the
+// strongest variant of GCM.
 const AES_KEY_BITS = 256;
+const AES_GCM_IV_BYTES = 12;
+const AES_GCM_TAG_BITS = 128;
+const AES_GCM_TAG_BYTES = AES_GCM_TAG_BITS / 8;
+
+const AES_GCM_KEY_ALG: AesKeyGenParams = {
+  name: "AES-GCM",
+  length: AES_KEY_BITS,
+};
+
+function gcmParams(iv: Bytes): AesGcmParams {
+  return { name: "AES-GCM", iv, tagLength: AES_GCM_TAG_BITS };
+}
 
 // -----------------------------------------------------------------------------
 // Base64 helpers (URL-safe-tolerant). Avoids `Buffer` so the same code runs in
@@ -101,7 +124,7 @@ export async function importMasterKek(masterKekB64: string): Promise<CryptoKey> 
   return crypto.subtle.importKey(
     "raw",
     raw,
-    { name: "AES-GCM", length: AES_KEY_BITS },
+    AES_GCM_KEY_ALG,
     /* extractable */ false,
     ["encrypt", "decrypt", "wrapKey", "unwrapKey"],
   );
@@ -118,7 +141,7 @@ export async function importMasterKek(masterKekB64: string): Promise<CryptoKey> 
  */
 export async function generateUserDek(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(
-    { name: "AES-GCM", length: AES_KEY_BITS },
+    AES_GCM_KEY_ALG,
     /* extractable */ true,
     ["encrypt", "decrypt"],
   );
@@ -138,9 +161,15 @@ export async function wrapUserDek(
   kek: CryptoKey,
 ): Promise<{ wrappedB64: string; ivB64: string }> {
   const rawDek = copyBytes(await crypto.subtle.exportKey("raw", dek));
+  if (rawDek.byteLength !== AES_KEY_BITS / 8) {
+    // Defensive: ensures exportKey gave us a 256-bit DEK and not something
+    // shorter. Should never fire with generateUserDek above, but the check
+    // keeps the invariant local to wrap/unwrap.
+    throw new Error(`Expected a ${AES_KEY_BITS / 8}-byte DEK, got ${rawDek.byteLength}.`);
+  }
   const iv = randomIv();
   const wrapped = copyBytes(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv }, kek, rawDek),
+    await crypto.subtle.encrypt(gcmParams(iv), kek, rawDek),
   );
   return { wrappedB64: bytesToBase64(wrapped), ivB64: bytesToBase64(iv) };
 }
@@ -157,13 +186,25 @@ export async function unwrapUserDek(
 ): Promise<CryptoKey> {
   const wrapped = base64ToBytes(wrappedB64);
   const iv = base64ToBytes(ivB64);
+  // Reject malformed wraps before calling decrypt. The wrapped DEK is the raw
+  // 32-byte key plus a 16-byte GCM auth tag, so anything shorter is invalid
+  // by construction. Likewise the IV must be the canonical 12 bytes — accepting
+  // a shorter IV here would silently weaken AES-GCM.
+  if (iv.byteLength !== AES_GCM_IV_BYTES) {
+    throw new Error(`DEK IV must be ${AES_GCM_IV_BYTES} bytes (got ${iv.byteLength}).`);
+  }
+  if (wrapped.byteLength !== AES_KEY_BITS / 8 + AES_GCM_TAG_BYTES) {
+    throw new Error(
+      `Wrapped DEK has unexpected length ${wrapped.byteLength}; expected ${AES_KEY_BITS / 8 + AES_GCM_TAG_BYTES}.`,
+    );
+  }
   const rawDek = copyBytes(
-    await crypto.subtle.decrypt({ name: "AES-GCM", iv }, kek, wrapped),
+    await crypto.subtle.decrypt(gcmParams(iv), kek, wrapped),
   );
   return crypto.subtle.importKey(
     "raw",
     rawDek,
-    { name: "AES-GCM", length: AES_KEY_BITS },
+    AES_GCM_KEY_ALG,
     /* extractable */ false,
     ["encrypt", "decrypt"],
   );
@@ -186,7 +227,7 @@ export async function encryptWithDek(
   const iv = randomIv();
   const cipher = copyBytes(
     await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
+      gcmParams(iv),
       dek,
       copyBytes(new TextEncoder().encode(plaintext)),
     ),
@@ -200,7 +241,7 @@ export async function decryptWithDek(
 ): Promise<string> {
   const blob = base64ToBytes(ciphertextB64);
   const { iv, cipher } = unpackIvAndCipher(blob);
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, dek, cipher);
+  const plain = await crypto.subtle.decrypt(gcmParams(iv), dek, cipher);
   return new TextDecoder().decode(plain);
 }
 
@@ -212,8 +253,9 @@ function packIvAndCipher(iv: Bytes, cipher: Bytes): Bytes {
 }
 
 function unpackIvAndCipher(blob: Bytes): { iv: Bytes; cipher: Bytes } {
-  if (blob.byteLength < AES_GCM_IV_BYTES + 16) {
-    // 16 bytes is the smallest AES-GCM tag size — anything shorter is invalid.
+  // AES-GCM 128-bit tag is appended to the ciphertext, so a valid blob must
+  // be at least IV + tag long. Anything shorter is malformed.
+  if (blob.byteLength < AES_GCM_IV_BYTES + AES_GCM_TAG_BYTES) {
     throw new Error("Encrypted blob is too short to contain an IV + ciphertext.");
   }
   const iv = makeBytes(AES_GCM_IV_BYTES);
