@@ -315,7 +315,7 @@ export default function OnboardingPage() {
             </div>
           </OnboardingSection>
 
-          {error ? <p role="alert" className="rounded-2xl border border-red-300/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</p> : null}
+          {error ? <p role="alert" className="alert-surface px-4 py-3 text-sm">{error}</p> : null}
 
           <button
             type="submit"

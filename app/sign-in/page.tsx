@@ -80,11 +80,11 @@ export default function SignInPage() {
                 <input
                   type="checkbox"
                   name="remember"
-                  className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[#ff4458]"
+                  className="h-4 w-4 rounded border-white/20 bg-white/10 accent-[var(--color-interactive)]"
                 />
                 Keep me signed in
               </label>
-              <Link href="/sign-in" className="font-bold text-[#ff8a72]">
+              <Link href="/sign-in" className="font-bold text-[var(--color-interactive)]">
                 Reset password
               </Link>
             </div>

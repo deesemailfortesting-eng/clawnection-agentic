@@ -196,7 +196,7 @@ export default function VoiceOnboardingPage() {
         </header>
 
         {error && (
-          <div role="alert" className="rounded-2xl border border-red-300/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">
+          <div role="alert" className="alert-panel px-4 py-3 text-sm">
             {error}
           </div>
         )}
@@ -211,7 +211,7 @@ export default function VoiceOnboardingPage() {
             </div>
             <div
               aria-hidden="true"
-              className={`mt-1 h-5 w-5 rounded-full ${isCallActive ? "animate-pulse bg-emerald-400 shadow-[0_0_26px_rgba(52,211,153,0.8)]" : "bg-white/18"}`}
+              className={`mt-1 h-5 w-5 rounded-full ${isCallActive ? "animate-pulse bg-[var(--interactive)] shadow-[0_0_26px_rgba(216,191,65,0.55)]" : "bg-white/18"}`}
             />
           </div>
           <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-white">

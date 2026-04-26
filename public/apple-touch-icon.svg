@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-labelledby="title">
   <title>wtfradar app icon</title>
-  <rect width="180" height="180" rx="42" fill="#07070a"/>
-  <circle cx="90" cy="90" r="58" fill="none" stroke="#ff4458" stroke-width="12"/>
-  <circle cx="90" cy="90" r="28" fill="none" stroke="#ff7a18" stroke-width="10"/>
-  <circle cx="116" cy="64" r="14" fill="#ffffff"/>
-  <path d="M90 90 132 46" stroke="#ffffff" stroke-width="9" stroke-linecap="round"/>
+  <rect width="180" height="180" rx="42" fill="#3f1525"/>
+  <circle cx="90" cy="90" r="58" fill="none" stroke="#d982aa" stroke-width="12"/>
+  <circle cx="90" cy="90" r="28" fill="none" stroke="#d8bf41" stroke-width="10"/>
+  <circle cx="116" cy="64" r="14" fill="#f2c9dc"/>
+  <path d="M90 90 132 46" stroke="#f2c9dc" stroke-width="9" stroke-linecap="round"/>
 </svg>

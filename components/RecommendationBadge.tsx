@@ -1,9 +1,9 @@
 import { Recommendation } from "@/lib/types/matching";
 
 const palette = {
-  meet: "bg-emerald-400/14 text-emerald-100 border-emerald-300/32",
-  maybe: "bg-amber-400/14 text-amber-100 border-amber-300/32",
-  "not-recommended": "bg-red-400/14 text-red-100 border-red-300/32",
+  meet: "border-[#D9BF41]/45 bg-[#D9BF41]/15 text-[#F2C9DC]",
+  maybe: "border-[#D982AB]/45 bg-[#D982AB]/15 text-[#F2C9DC]",
+  "not-recommended": "border-[#8E58A6]/45 bg-[#8E58A6]/18 text-[#F2C9DC]",
 } as const;
 
 export function RecommendationBadge({ recommendation }: { recommendation: Recommendation }) {

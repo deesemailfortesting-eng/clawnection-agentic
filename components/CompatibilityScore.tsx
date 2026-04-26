@@ -3,7 +3,7 @@ type CompatibilityScoreProps = {
 };
 
 export function CompatibilityScore({ score }: CompatibilityScoreProps) {
-  const hue = score >= 75 ? "bg-emerald-400" : score >= 55 ? "bg-amber-400" : "bg-[#ff4458]";
+  const hue = score >= 75 ? "bg-[#D9BF41]" : score >= 55 ? "bg-[#D982AB]" : "bg-[#8E58A6]";
   const summary =
     score >= 75
       ? "Strong match signal"

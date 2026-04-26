@@ -161,7 +161,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
                 <span className="truncate max-w-[200px] text-white/72">{fileName}</span>
                 <span className="text-white/42">{fs.userMessageCount.toLocaleString()} msgs</span>
                 <div className="flex-1 h-1.5 rounded-full bg-white/14 overflow-hidden">
-                  <div className="h-full rounded-full bg-[#ff4458]" style={{ width: `${pct}%` }} />
+                  <div className="h-full rounded-full bg-[var(--color-interactive)]" style={{ width: `${pct}%` }} />
                 </div>
                 <span className="text-xs text-white/42 w-8 text-right">{pct}%</span>
               </div>
@@ -170,14 +170,14 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
         </div>
 
         {/* Combined signal preview */}
-        <div className="rounded-2xl border border-emerald-300/24 bg-emerald-400/10 p-5 space-y-4">
+        <div className="space-y-4 rounded-2xl border border-[rgba(216,191,65,0.3)] bg-[rgba(216,191,65,0.1)] p-5">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-emerald-100 font-semibold text-sm">Combined analysis</span>
-            <span className="rounded-full bg-emerald-300/18 px-2 py-0.5 text-xs text-emerald-100">
+            <span className="text-sm font-semibold text-[var(--color-text-primary)]">Combined analysis</span>
+            <span className="rounded-full bg-[rgba(216,191,65,0.18)] px-2 py-0.5 text-xs text-[var(--color-text-primary)]">
               {s.userMessageCount.toLocaleString()} messages · {fileResults.length} chat{fileResults.length > 1 ? "s" : ""}
             </span>
             {s.isLowConfidence && (
-              <span className="rounded-full bg-amber-300/18 px-2 py-0.5 text-xs text-amber-100">
+              <span className="rounded-full bg-[rgba(142,88,166,0.28)] px-2 py-0.5 text-xs text-[var(--color-text-primary)]">
                 low confidence
               </span>
             )}
@@ -196,7 +196,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
             <div><span className="text-white/52">Coverage quality</span><span className="ml-2 font-medium text-white/84">{s.coverageSummary.coverageQuality}</span></div>
           </div>
 
-          <div className="rounded-xl border border-emerald-300/24 bg-white/[0.05] px-4 py-3 text-sm text-white/72">
+          <div className="rounded-xl border border-[rgba(216,191,65,0.26)] bg-white/[0.05] px-4 py-3 text-sm text-white/72">
             <p className="font-medium text-white">Safe summary candidates</p>
             <div className="mt-2 space-y-2">
               {s.shareableSummary.map((summary) => (
@@ -205,7 +205,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
                     <span className="text-white/52">{summary.label}</span>
                     <span className="ml-2 font-medium text-white/84">{summary.value}</span>
                   </div>
-                  <span className="rounded-full bg-emerald-300/18 px-2 py-0.5 text-xs text-emerald-100">
+                  <span className="rounded-full bg-[rgba(216,191,65,0.18)] px-2 py-0.5 text-xs text-[var(--color-text-primary)]">
                     {summary.confidence}
                   </span>
                 </div>
@@ -235,7 +235,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
           )}
 
           {!s.isLowConfidence && changedFields.length > 0 ? (
-            <div className="rounded-xl border border-emerald-300/30 bg-white/[0.05] px-4 py-3 text-sm text-white/72">
+            <div className="rounded-xl border border-[rgba(216,191,65,0.3)] bg-white/[0.05] px-4 py-3 text-sm text-white/72">
               <span className="font-medium">Will update: </span>
               {changedFields.map((f, i) => {
                 const before = f === "communicationStyle"
@@ -261,7 +261,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
           <button
             type="button"
             onClick={() => onApply(state.updatedProfile, state.mergedSignals, state.gap)}
-            className="flex-1 rounded-xl bg-emerald-500/80 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
+            className="flex-1 rounded-xl bg-[var(--interactive)] px-4 py-2.5 text-sm font-semibold text-[var(--interactive-foreground)] transition hover:brightness-110"
           >
             Apply to profile
           </button>
@@ -307,7 +307,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
             type="checkbox"
             checked={hasAcceptedConsent}
             onChange={(e) => setHasAcceptedConsent(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-white/20 text-[#ff4458] focus:ring-[#ff7a18]"
+            className="mt-1 h-4 w-4 rounded border-white/20 accent-[var(--color-interactive)] focus:ring-[var(--color-interactive)]"
           />
           <span>
             I consent to analyzing this WhatsApp export for behavioral matchmaking signals in this prototype.
@@ -333,7 +333,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
       <div
         className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${
           canUpload
-            ? "cursor-pointer border-white/20 bg-white/[0.05] hover:border-[#ff7a18] hover:bg-white/[0.08]"
+            ? "cursor-pointer border-white/20 bg-white/[0.05] hover:border-[var(--color-interactive)] hover:bg-white/[0.08]"
             : "cursor-not-allowed border-white/10 bg-white/10 text-white/42"
         }`}
         onDrop={handleDrop}
@@ -375,7 +375,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
       </div>
 
       {state.status === "error" && (
-        <div className="rounded-xl border border-red-300/40 bg-red-500/12 px-3 py-2 text-sm text-red-100 whitespace-pre-line">
+        <div className="alert-surface whitespace-pre-line px-3 py-2 text-sm">
           {state.message}
         </div>
       )}

@@ -64,7 +64,7 @@ export default function ResultsPage() {
 
         <section aria-labelledby="summary-title" className="grid gap-4">
           <h2 id="summary-title" className="text-2xl font-black tracking-tight text-white">Plain-language summary</h2>
-          <article className="rounded-[28px] border border-emerald-300/25 bg-emerald-400/10 p-5">
+          <article className="rounded-[28px] border border-[rgba(216,191,65,0.30)] bg-[rgba(216,191,65,0.10)] p-5">
             <h3 className="text-lg font-black text-white">Top strengths</h3>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-white/72">
               {result.strengths.map((strength) => (
@@ -72,7 +72,7 @@ export default function ResultsPage() {
               ))}
             </ul>
           </article>
-          <article className="rounded-[28px] border border-amber-300/25 bg-amber-400/10 p-5">
+          <article className="rounded-[28px] border border-[rgba(216,130,170,0.30)] bg-[rgba(216,130,170,0.10)] p-5">
             <h3 className="text-lg font-black text-white">Top concerns</h3>
             <ul className="mt-3 space-y-3 text-sm leading-6 text-white/72">
               {result.concerns.length === 0 ? <li>No major concerns detected in this simulation.</li> : null}
@@ -99,8 +99,15 @@ export default function ResultsPage() {
           </article>
         </section>
 
-        <section aria-label="Human choice reminder" className="rounded-[28px] border border-pink-300/30 bg-pink-500/10 p-5">
-          <p className="text-sm leading-6 text-pink-50">
+        <section
+          aria-label="Human choice reminder"
+          className="rounded-[28px] p-5"
+          style={{
+            background: "rgba(216, 130, 170, 0.10)",
+            border: "1px solid rgba(216, 130, 170, 0.30)",
+          }}
+        >
+          <p className="text-sm leading-6 text-[var(--color-text-primary)]">
             Agents provide recommendations, not decisions. Final choice always belongs to both people.
           </p>
         </section>

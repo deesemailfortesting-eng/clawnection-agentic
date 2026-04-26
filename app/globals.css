@@ -1,21 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: #07070a;
-  --foreground: #f8fafc;
-  --card: #111118;
-  --card-strong: #171722;
-  --muted: #9ca3af;
-  --border: rgba(255, 255, 255, 0.12);
-  --glass-fill: rgba(255, 255, 255, 0.074);
-  --glass-fill-strong: rgba(255, 255, 255, 0.12);
-  --glass-stroke: rgba(255, 255, 255, 0.18);
+  --chromia-wine: #3f1525;
+  --chromia-rose: #d982aa;
+  --chromia-blush: #f2c9dc;
+  --chromia-violet: #8e58a5;
+  --chromia-gold: #d8bf41;
+  --background: #170913;
+  --foreground: #fff7fb;
+  --card: #2b1020;
+  --card-strong: #3f1525;
+  --muted: #f2c9dc;
+  --border: rgba(242, 201, 220, 0.18);
+  --glass-fill: rgba(63, 21, 37, 0.62);
+  --glass-fill-strong: rgba(63, 21, 37, 0.78);
+  --glass-stroke: rgba(242, 201, 220, 0.22);
   --hardware-radius: 44px;
   --content-radius: 30px;
   --control-radius: 18px;
-  --radar-pink: #ff4458;
-  --radar-orange: #ff7a18;
-  --radar-violet: #7c3aed;
+  --interactive: var(--chromia-gold);
+  --interactive-foreground: var(--chromia-wine);
+  --brand-primary: var(--chromia-rose);
+  --brand-secondary: var(--chromia-violet);
+  --brand-soft: var(--chromia-blush);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -25,7 +32,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "proxima-nova", "Inter", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
 }
 
 * {
@@ -68,22 +75,22 @@ a {
 }
 
 ::selection {
-  background: rgba(255, 68, 88, 0.35);
-  color: #ffffff;
+  background: rgba(216, 191, 65, 0.36);
+  color: var(--foreground);
 }
 
 :focus-visible {
-  outline: 3px solid rgba(255, 122, 24, 0.95);
+  outline: 3px solid var(--interactive);
   outline-offset: 3px;
 }
 
 .phone-shell {
   min-height: 100dvh;
   background:
-    radial-gradient(circle at top left, rgba(255, 68, 88, 0.24), transparent 26rem),
-    radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.22), transparent 24rem),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.10), transparent 32rem),
-    #030306;
+    radial-gradient(circle at top left, rgba(216, 130, 170, 0.26), transparent 26rem),
+    radial-gradient(circle at bottom right, rgba(142, 87, 165, 0.28), transparent 24rem),
+    linear-gradient(145deg, rgba(242, 201, 220, 0.10), transparent 32rem),
+    #10060d;
   padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
 }
 
@@ -92,8 +99,8 @@ a {
   min-height: 100dvh;
   margin: 0 auto;
   background:
-    radial-gradient(circle at 50% -4rem, rgba(255, 255, 255, 0.16), transparent 13rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0)),
+    radial-gradient(circle at 50% -4rem, rgba(242, 201, 220, 0.18), transparent 13rem),
+    linear-gradient(180deg, rgba(242, 201, 220, 0.08), rgba(242, 201, 220, 0)),
     var(--background);
   color: var(--foreground);
   position: relative;
@@ -113,11 +120,11 @@ a {
     min-height: min(860px, calc(100dvh - 48px));
     max-height: calc(100dvh - 48px);
     overflow: auto;
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(242, 201, 220, 0.18);
     border-radius: var(--hardware-radius);
     box-shadow:
       0 34px 100px rgba(0, 0, 0, 0.56),
-      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+      inset 0 1px 0 rgba(242, 201, 220, 0.12);
   }
 }
 
@@ -131,7 +138,7 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: calc(12px + var(--safe-top)) 24px 0;
-  color: rgba(255, 255, 255, 0.70);
+  color: rgba(242, 201, 220, 0.78);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -145,17 +152,17 @@ a {
   height: 5px;
   margin: 10px auto 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(242, 201, 220, 0.56);
 }
 
 .liquid-glass {
   border: 1px solid var(--glass-stroke);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.045)),
+    linear-gradient(145deg, rgba(242, 201, 220, 0.16), rgba(242, 201, 220, 0.045)),
     var(--glass-fill);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 1px 0 rgba(242, 201, 220, 0.18),
+    inset 0 -1px 0 rgba(242, 201, 220, 0.06),
     0 18px 54px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(28px) saturate(135%);
   -webkit-backdrop-filter: blur(28px) saturate(135%);
@@ -173,8 +180,8 @@ a {
   z-index: -1;
   border-radius: inherit;
   background:
-    radial-gradient(circle at 20% 0%, rgba(255, 68, 88, 0.22), transparent 13rem),
-    radial-gradient(circle at 100% 100%, rgba(255, 122, 24, 0.12), transparent 12rem);
+    radial-gradient(circle at 20% 0%, rgba(216, 130, 170, 0.24), transparent 13rem),
+    radial-gradient(circle at 100% 100%, rgba(216, 191, 65, 0.14), transparent 12rem);
   content: "";
   filter: blur(1px);
 }
@@ -182,10 +189,10 @@ a {
 .obsidian-card {
   border: 1px solid var(--glass-stroke);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045)),
+    linear-gradient(145deg, rgba(242, 201, 220, 0.14), rgba(242, 201, 220, 0.048)),
     var(--glass-fill);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 1px 0 rgba(242, 201, 220, 0.14),
     0 18px 50px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(24px) saturate(128%);
   -webkit-backdrop-filter: blur(24px) saturate(128%);
@@ -199,11 +206,11 @@ a {
 }
 
 .radar-gradient {
-  background: linear-gradient(135deg, var(--radar-pink), var(--radar-orange));
+  background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
 }
 
 .radar-text-gradient {
-  background: linear-gradient(135deg, #ff6072, #ffb86b);
+  background: linear-gradient(135deg, var(--brand-soft), var(--interactive));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -214,26 +221,26 @@ a {
   min-height: 48px;
   border-radius: var(--control-radius);
   border: 1px solid var(--glass-stroke);
-  background: rgba(255, 255, 255, 0.095);
+  background: rgba(242, 201, 220, 0.095);
   padding: 0.75rem 0.95rem;
-  color: #ffffff;
+  color: var(--foreground);
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .field::placeholder {
-  color: rgba(255, 255, 255, 0.42);
+  color: rgba(242, 201, 220, 0.62);
 }
 
 .field:focus {
-  border-color: rgba(255, 122, 24, 0.9);
-  box-shadow: 0 0 0 4px rgba(255, 122, 24, 0.14);
+  border-color: var(--interactive);
+  box-shadow: 0 0 0 4px rgba(216, 191, 65, 0.18);
   background: var(--glass-fill-strong);
 }
 
 select.field option {
-  background: #111118;
-  color: #ffffff;
+  background: var(--chromia-wine);
+  color: var(--foreground);
 }
 
 .primary-button {
@@ -242,23 +249,23 @@ select.field option {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 1px solid rgba(255, 247, 251, 0.28);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.22), transparent 42%),
-    linear-gradient(135deg, var(--radar-pink), var(--radar-orange));
+    linear-gradient(145deg, rgba(255, 247, 251, 0.26), transparent 42%),
+    var(--interactive);
   padding: 0.85rem 1.1rem;
-  color: #ffffff;
+  color: var(--interactive-foreground);
   font-weight: 800;
   letter-spacing: 0.01em;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 14px 34px rgba(255, 68, 88, 0.28);
+    inset 0 1px 0 rgba(255, 247, 251, 0.24),
+    0 14px 34px rgba(216, 191, 65, 0.20);
   transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
 }
 
 .primary-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 18px 40px rgba(255, 68, 88, 0.34);
+  box-shadow: 0 18px 40px rgba(216, 191, 65, 0.26);
 }
 
 .primary-button:active {
@@ -280,10 +287,10 @@ select.field option {
   border-radius: 999px;
   border: 1px solid var(--glass-stroke);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.055)),
+    linear-gradient(145deg, rgba(242, 201, 220, 0.14), rgba(242, 201, 220, 0.055)),
     var(--glass-fill);
   padding: 0.85rem 1.1rem;
-  color: #ffffff;
+  color: var(--foreground);
   font-weight: 750;
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
   backdrop-filter: blur(20px) saturate(130%);
@@ -291,8 +298,8 @@ select.field option {
 }
 
 .secondary-button:hover {
-  border-color: rgba(255, 255, 255, 0.26);
-  background: rgba(255, 255, 255, 0.10);
+  border-color: rgba(242, 201, 220, 0.34);
+  background: rgba(242, 201, 220, 0.12);
 }
 
 .secondary-button:active {
@@ -306,12 +313,48 @@ select.field option {
   border-radius: 999px;
   border: 1px solid var(--glass-stroke);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.055)),
+    linear-gradient(145deg, rgba(242, 201, 220, 0.14), rgba(242, 201, 220, 0.055)),
     var(--glass-fill);
   padding: 0.38rem 0.7rem;
-  color: rgba(255, 255, 255, 0.76);
+  color: rgba(255, 247, 251, 0.82);
   font-size: 0.75rem;
   font-weight: 750;
+}
+
+.alert-message {
+  border: 1px solid rgba(216, 130, 170, 0.42);
+  background: rgba(63, 21, 37, 0.82);
+  color: var(--foreground);
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --glass-fill: rgba(63, 21, 37, 0.92);
+    --glass-fill-strong: rgba(63, 21, 37, 0.98);
+    --glass-stroke: rgba(242, 201, 220, 0.42);
+  }
+
+  .ios-status-bar,
+  .pill,
+  .field::placeholder {
+    color: var(--foreground);
+  }
+
+  .obsidian-card,
+  .obsidian-panel,
+  .liquid-glass {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass,
+  .obsidian-card,
+  .obsidian-panel {
+    background: var(--card-strong);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 .sr-only {
