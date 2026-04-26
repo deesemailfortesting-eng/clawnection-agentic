@@ -59,12 +59,23 @@ const fieldClass =
 export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUploadProps) {
   const [state, setState] = useState<UploadState>({ status: "idle" });
   const [userName, setUserName] = useState("");
+  const [hasAcceptedConsent, setHasAcceptedConsent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const canUpload = hasAcceptedConsent && state.status !== "loading";
 
   async function processFiles(files: File[]) {
     const trimmedName = userName.trim();
     if (!trimmedName) {
       setState({ status: "error", message: "Enter your name as it appears in the chat before uploading." });
+      return;
+    }
+
+    if (!hasAcceptedConsent) {
+      setState({
+        status: "error",
+        message:
+          "Review and accept the WhatsApp consent terms before uploading your export.",
+      });
       return;
     }
 
@@ -115,6 +126,13 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
+    if (!canUpload) {
+      setState({
+        status: "error",
+        message: "Review and accept the WhatsApp consent terms before uploading your export.",
+      });
+      return;
+    }
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) processFiles(files);
   }
@@ -218,6 +236,35 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
 
   return (
     <div className="space-y-4">
+      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 space-y-3">
+        <div>
+          <p className="font-medium text-zinc-900">WhatsApp consent</p>
+          <p className="mt-1 text-zinc-600">
+            Uploading a WhatsApp export lets Clawnection extract behavioral signals from your messages, such as response rhythm,
+            message depth, emoji use, and active hours.
+          </p>
+        </div>
+
+        <ul className="space-y-1 text-zinc-600">
+          <li>Used internally: your uploaded chats are analyzed to derive behavioral signals and compare them to your stated profile.</li>
+          <li>Surfaced to you: only summary metrics and profile updates are shown in this flow, not raw transcript excerpts.</li>
+          <li>Storage in this MVP: data is processed in your browser and saved locally on this device via browser storage.</li>
+          <li>Revocation in this MVP: you can clear your browser storage later to remove saved profile and signal data from this prototype.</li>
+        </ul>
+
+        <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
+          <input
+            type="checkbox"
+            checked={hasAcceptedConsent}
+            onChange={(e) => setHasAcceptedConsent(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-zinc-300 text-rose-500 focus:ring-rose-300"
+          />
+          <span>
+            I consent to analyzing this WhatsApp export for behavioral matchmaking signals in this prototype.
+          </span>
+        </label>
+      </div>
+
       <div>
         <label className="text-sm text-zinc-700">
           Your name in the chats
@@ -234,10 +281,23 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
       </div>
 
       <div
-        className="rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50 p-8 text-center transition hover:border-rose-300 hover:bg-rose-50 cursor-pointer"
+        className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${
+          canUpload
+            ? "cursor-pointer border-zinc-300 bg-zinc-50 hover:border-rose-300 hover:bg-rose-50"
+            : "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
+        }`}
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => {
+          if (!canUpload) {
+            setState({
+              status: "error",
+              message: "Review and accept the WhatsApp consent terms before uploading your export.",
+            });
+            return;
+          }
+          fileInputRef.current?.click();
+        }}
       >
         <input
           ref={fileInputRef}
@@ -245,6 +305,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
           accept=".txt,.zip"
           multiple
           className="hidden"
+          disabled={!hasAcceptedConsent}
           onChange={handleFileChange}
         />
         {state.status === "loading" ? (
@@ -255,7 +316,9 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
           <>
             <p className="text-sm font-medium text-zinc-700">Drop your WhatsApp exports here</p>
             <p className="mt-1 text-xs text-zinc-400">
-              Select multiple files at once · .txt or .zip · signals are merged weighted by message count
+              {hasAcceptedConsent
+                ? "Select multiple files at once · .txt or .zip · signals are merged weighted by message count"
+                : "Accept the consent terms above to enable upload"}
             </p>
           </>
         )}
