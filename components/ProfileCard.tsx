@@ -9,22 +9,22 @@ type ProfileCardProps = {
 
 export function ProfileCard({ profile, title, subtitle, compact = false }: ProfileCardProps) {
   return (
-    <article className="rounded-2xl border border-rose-100 bg-white/95 p-5 shadow-sm">
-      {title ? <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">{title}</p> : null}
-      <div className="mt-2 flex items-center justify-between gap-4">
-        <h3 className="text-xl font-semibold text-zinc-900">{profile.name}, {profile.age}</h3>
-        <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-white">
-          {profile.agentType === "hosted" ? "Hosted Agent" : "External / Mock Agent"}
+    <article className="obsidian-card rounded-[28px] p-5">
+      {title ? <p className="text-xs font-black uppercase tracking-[0.2em] text-white/44">{title}</p> : null}
+      <div className="mt-3 flex items-start justify-between gap-4">
+        <h3 className="text-2xl font-black tracking-tight text-white">{profile.name}, {profile.age}</h3>
+        <span className="pill shrink-0">
+          {profile.agentType === "hosted" ? "Hosted" : "External"}
         </span>
       </div>
-      {subtitle ? <p className="mt-1 text-sm text-zinc-500">{subtitle}</p> : null}
-      <p className="mt-3 text-sm leading-6 text-zinc-700">{profile.bio}</p>
+      {subtitle ? <p className="mt-1 text-sm text-white/46">{subtitle}</p> : null}
+      <p className="mt-4 text-sm leading-6 text-white/68">{profile.bio}</p>
       {!compact ? (
-        <div className="mt-4 space-y-2 text-sm text-zinc-600">
-          <p><span className="font-medium text-zinc-800">Intent:</span> {profile.relationshipIntent}</p>
-          <p><span className="font-medium text-zinc-800">Values:</span> {profile.values.slice(0, 3).join(", ")}</p>
-          <p><span className="font-medium text-zinc-800">Interests:</span> {profile.interests.slice(0, 3).join(", ")}</p>
-          <p><span className="font-medium text-zinc-800">Location:</span> {profile.location}</p>
+        <div className="mt-5 grid gap-2 text-sm text-white/62">
+          <p><span className="font-black text-white">Intent:</span> {profile.relationshipIntent}</p>
+          <p><span className="font-black text-white">Values:</span> {profile.values.slice(0, 3).join(", ") || "Not added"}</p>
+          <p><span className="font-black text-white">Interests:</span> {profile.interests.slice(0, 3).join(", ") || "Not added"}</p>
+          <p><span className="font-black text-white">Location:</span> {profile.location}</p>
         </div>
       ) : null}
     </article>

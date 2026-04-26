@@ -2,9 +2,25 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clawnection · Agentic Matchmaking MVP",
+  metadataBase: new URL("https://wtfradar.com"),
+  title: {
+    default: "wtfradar · AI dating that checks the vibe first",
+    template: "%s · wtfradar",
+  },
   description:
-    "Romance-first agentic matchmaking prototype where personal agents run bounded virtual dates and humans stay in control.",
+    "A mobile-first AI dating platform where personal agents run structured virtual dates before people decide whether to meet.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.svg", type: "image/svg+xml" }],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "wtfradar",
+  },
 };
 
 export default function RootLayout({
@@ -14,7 +30,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full bg-white font-sans text-zinc-900">{children}</body>
+      <head>
+        <link rel="stylesheet" href="https://use.typekit.net/qly1tpd.css" />
+      </head>
+      <body className="min-h-full bg-background font-sans text-foreground">{children}</body>
     </html>
   );
 }

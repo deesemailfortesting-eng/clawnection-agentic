@@ -9,10 +9,12 @@ export function OnboardingSection({
   description: string;
   children: ReactNode;
 }) {
+  const headingId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-title`;
+
   return (
-    <section className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-zinc-900">{title}</h2>
-      <p className="mt-1 text-sm text-zinc-600">{description}</p>
+    <section aria-labelledby={headingId} className="obsidian-card rounded-[28px] p-5">
+      <h2 id={headingId} className="text-xl font-black tracking-tight text-white">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-white/62">{description}</p>
       <div className="mt-4 grid gap-4">{children}</div>
     </section>
   );
