@@ -50,6 +50,61 @@ export function loadSignals(): WhatsAppSignals | null {
     parsed.exportDateRange.earliest = new Date(parsed.exportDateRange.earliest);
     parsed.exportDateRange.latest = new Date(parsed.exportDateRange.latest);
     parsed.analysedAt = new Date(parsed.analysedAt);
+
+    if (!parsed.extractionMetadata) {
+      parsed.extractionMetadata = {
+        source: "whatsapp-export",
+        fileCount: 1,
+        parseErrors: 0,
+        detectedFormats: ["unknown"],
+      };
+    }
+
+    if (!parsed.signalFamilyMetadata) {
+      parsed.signalFamilyMetadata = {
+        communicationStyle: {
+          confidence: parsed.isLowConfidence ? "low" : "medium",
+          sensitivity: "shareable-summary",
+          provenance: {
+            ...parsed.extractionMetadata,
+            userMessageCount: parsed.userMessageCount,
+            totalMessages: parsed.totalMessages,
+          },
+        },
+        responsiveness: {
+          confidence: parsed.isLowConfidence ? "low" : "medium",
+          sensitivity: "shareable-summary",
+          provenance: {
+            ...parsed.extractionMetadata,
+            userMessageCount: parsed.userMessageCount,
+            totalMessages: parsed.totalMessages,
+          },
+        },
+        activeHours: {
+          confidence: parsed.isLowConfidence ? "low" : "medium",
+          sensitivity: "shareable-summary",
+          provenance: {
+            ...parsed.extractionMetadata,
+            userMessageCount: parsed.userMessageCount,
+            totalMessages: parsed.totalMessages,
+          },
+        },
+        relationshipPatterns: {
+          confidence: parsed.isLowConfidence ? "low" : "medium",
+          sensitivity: "private-only",
+          provenance: {
+            ...parsed.extractionMetadata,
+            userMessageCount: parsed.userMessageCount,
+            totalMessages: parsed.totalMessages,
+          },
+        },
+      };
+    }
+
+    if (!parsed.shareableSummary) {
+      parsed.shareableSummary = [];
+    }
+
     return parsed;
   } catch {
     return null;

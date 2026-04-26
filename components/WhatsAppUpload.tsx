@@ -89,12 +89,19 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
       setState({ status: "loading", processed: i, total: files.length });
       try {
         const text = await readFileAsText(file);
-        const { messages } = parseWhatsAppExport(text);
+        const parseResult = parseWhatsAppExport(text);
+        const { messages } = parseResult;
         if (messages.length === 0) {
           errors.push(`${file.name}: no messages found`);
           continue;
         }
-        const signals = extractSignals(messages, trimmedName);
+        const signals = extractSignals(messages, trimmedName, {
+          extractionMetadata: {
+            fileCount: 1,
+            parseErrors: parseResult.parseErrors,
+            detectedFormats: [parseResult.detectedFormat],
+          },
+        });
         if (signals.userMessageCount === 0) {
           errors.push(`${file.name}: no messages from "${trimmedName}" — check the name matches exactly`);
           continue;
@@ -182,6 +189,25 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
             <div><span className="text-zinc-500">Emoji density</span><span className="ml-2 font-medium text-zinc-800">{s.emojiDensity.toFixed(1)}/msg</span></div>
             <div><span className="text-zinc-500">Active hours</span><span className="ml-2 font-medium text-zinc-800">{s.activeHoursProfile}</span></div>
             <div><span className="text-zinc-500">Derived style</span><span className="ml-2 font-medium text-zinc-800">{s.derivedCommunicationStyle}</span></div>
+            <div><span className="text-zinc-500">Signal confidence</span><span className="ml-2 font-medium text-zinc-800">{s.signalFamilyMetadata.communicationStyle.confidence}</span></div>
+            <div><span className="text-zinc-500">Source coverage</span><span className="ml-2 font-medium text-zinc-800">{s.extractionMetadata.fileCount} file{ s.extractionMetadata.fileCount > 1 ? "s" : "" } · {s.extractionMetadata.detectedFormats.join(", ")}</span></div>
+          </div>
+
+          <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-zinc-700">
+            <p className="font-medium text-zinc-900">Safe summary candidates</p>
+            <div className="mt-2 space-y-2">
+              {s.shareableSummary.map((summary) => (
+                <div key={summary.label} className="flex items-start justify-between gap-4">
+                  <div>
+                    <span className="text-zinc-500">{summary.label}</span>
+                    <span className="ml-2 font-medium text-zinc-800">{summary.value}</span>
+                  </div>
+                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                    {summary.confidence}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {!s.isLowConfidence && changedFields.length > 0 ? (
