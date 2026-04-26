@@ -163,3 +163,59 @@ export function loadGap(): SelfAwarenessGap | null {
     return null;
   }
 }
+
+// Server sync helpers — best-effort, never throw
+export async function syncProfileToServer(profile: RomanticProfile): Promise<void> {
+  try {
+    await fetch("/api/profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profile),
+    });
+  } catch {
+    // offline or deploy not yet configured — silently skip
+  }
+}
+
+export async function syncSignalsToServer(
+  profileId: string,
+  signals: WhatsAppSignals,
+  fileCount: number,
+): Promise<void> {
+  try {
+    await fetch("/api/signals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId, signals, fileCount }),
+    });
+  } catch {
+    // silently skip
+  }
+}
+
+export async function syncGapToServer(
+  profileId: string,
+  gap: SelfAwarenessGap,
+): Promise<void> {
+  try {
+    await fetch("/api/gaps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId, gap }),
+    });
+  } catch {
+    // silently skip
+  }
+}
+
+export async function syncResultToServer(result: MatchResult): Promise<void> {
+  try {
+    await fetch("/api/matches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(result),
+    });
+  } catch {
+    // silently skip
+  }
+}

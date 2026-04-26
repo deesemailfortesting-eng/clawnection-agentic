@@ -26,16 +26,11 @@ The key principle is **human-in-the-loop decision making**:
 This prototype intentionally avoids backend complexity:
 
 - No authentication
-- No database
-- No Supabase
 - No OpenAI API integration yet
 - No OpenClaw integration yet
 - No external matchmaking dependencies
 
-State is local-only using:
-- local files
-- TypeScript modules
-- `localStorage`
+State is persisted via **Cloudflare D1** (edge SQLite) in the deployed version, with `localStorage` as a fast local cache and graceful fallback when offline. The API routes live under `app/api/` and use the `@opennextjs/cloudflare` adapter to access D1 bindings.
 
 ## Run locally
 
@@ -45,6 +40,23 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+## Cloudflare deployment
+
+A live deployment exists on Cloudflare Workers, **separate from the GitHub repository**. The deployed version may be ahead of or behind what is in git — they are not automatically synced.
+
+**Live URL:** https://clawnection.deesemailfortesting.workers.dev  
+**Account:** deesemailfortesting@gmail.com  
+**Worker name:** clawnection  
+**Database:** Cloudflare D1 · `clawnection-db`
+
+The deployed worker includes a D1-backed API layer (`/api/profiles`, `/api/signals`, `/api/gaps`, `/api/matches`) that is **not present in the original localStorage-only codebase**. Profile data, WhatsApp signals, and match results are persisted server-side on Cloudflare's edge.
+
+To redeploy manually:
+```bash
+CLOUDFLARE_API_TOKEN=<token> npx opennextjs-cloudflare build
+CLOUDFLARE_API_TOKEN=<token> npx opennextjs-cloudflare deploy
+```
 
 ## What is mocked vs future work
 
