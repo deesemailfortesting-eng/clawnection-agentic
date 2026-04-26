@@ -72,26 +72,6 @@ const STEP_ORDER: StepId[] = [
   "voice",
 ];
 
-const MONTH_OPTIONS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
-
-function daysInMonth(month: number, year: number): number {
-  if (!month || !year) return 31;
-  return new Date(year, month, 0).getDate();
-}
-
 /*
  * Capitalize each name token. Splits on spaces, hyphens, and apostrophes so
  * "mary jane" → "Mary Jane", "o'brien" → "O'Brien", "jean-luc" → "Jean-Luc".
@@ -104,7 +84,18 @@ function capitalizeName(input: string): string {
   );
 }
 
-function computeAgeFromDob(year: number, month: number, day: number): number {
+/*
+ * Computes age from an ISO 'YYYY-MM-DD' date string (the value emitted by
+ * <input type="date">). Returns 0 for invalid input. Accounts for whether
+ * this year's birthday has already happened.
+ */
+function computeAgeFromIsoDate(iso: string): number {
+  if (!iso) return 0;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return 0;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
   if (!year || !month || !day) return 0;
   const today = new Date();
   let age = today.getFullYear() - year;
@@ -113,6 +104,22 @@ function computeAgeFromDob(year: number, month: number, day: number): number {
     (today.getMonth() + 1 === month && today.getDate() < day);
   if (beforeBirthdayThisYear) age -= 1;
   return age;
+}
+
+/*
+ * Renders a YYYY-MM-DD date string into a friendly format like 'June 12, 2002'
+ * for the inline confirmation under the picker.
+ */
+function formatDobDisplay(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return "";
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 const genderOptions = [
@@ -186,9 +193,7 @@ export default function VoiceOnboardingPage() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [dobMonth, setDobMonth] = useState<number | "">("");
-  const [dobDay, setDobDay] = useState<number | "">("");
-  const [dobYear, setDobYear] = useState<number | "">("");
+  const [dob, setDob] = useState("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
   const [occupationType, setOccupationType] = useState<"work" | "school" | "">("");
@@ -217,26 +222,21 @@ export default function VoiceOnboardingPage() {
     document.title = "Onboarding · wtfradar";
   }, []);
 
-  const dobIsComplete =
-    typeof dobMonth === "number" && typeof dobDay === "number" && typeof dobYear === "number";
-  const ageNumber = dobIsComplete
-    ? computeAgeFromDob(dobYear as number, dobMonth as number, dobDay as number)
-    : 0;
+  const ageNumber = computeAgeFromIsoDate(dob);
+  const dobIsComplete = Boolean(dob);
   const ageIsValid = ageNumber >= 18 && ageNumber <= 120;
   const phoneDigitsOnly = phone.replace(/\D/g, "");
   const phoneIsValid = phoneDigitsOnly.length >= 7 && phoneDigitsOnly.length <= 15;
-  const currentYear = new Date().getFullYear();
-  const dobYearMax = currentYear - 18;
-  const dobYearMin = currentYear - 100;
-  const yearOptions = useMemo(() => {
-    const years: number[] = [];
-    for (let y = dobYearMax; y >= dobYearMin; y -= 1) years.push(y);
-    return years;
-  }, [dobYearMax, dobYearMin]);
-  const dayOptionsCount =
-    typeof dobMonth === "number" && typeof dobYear === "number"
-      ? daysInMonth(dobMonth, dobYear)
-      : 31;
+  const dobMaxIso = useMemo(() => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 18);
+    return today.toISOString().slice(0, 10);
+  }, []);
+  const dobMinIso = useMemo(() => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 100);
+    return today.toISOString().slice(0, 10);
+  }, []);
 
   const processAndSaveProfile = useCallback(
     (data: ProfileData) => {
@@ -566,65 +566,22 @@ export default function VoiceOnboardingPage() {
             continueDisabled={continueDisabled}
             error={dobIsComplete && !ageIsValid ? "You must be 18 or older to continue." : undefined}
           >
-            <div className="grid grid-cols-[1.4fr_0.9fr_1.1fr] gap-2">
-              <label className="grid gap-1 text-sm font-bold text-white/84">
-                <span className="text-xs uppercase tracking-[0.18em] text-white/52">Month</span>
-                <select
-                  className="field"
-                  value={dobMonth === "" ? "" : String(dobMonth)}
-                  onChange={(event) =>
-                    setDobMonth(event.target.value ? Number(event.target.value) : "")
-                  }
-                  aria-label="Birth month"
-                >
-                  <option value="">Month</option>
-                  {MONTH_OPTIONS.map((label, idx) => (
-                    <option key={label} value={idx + 1}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1 text-sm font-bold text-white/84">
-                <span className="text-xs uppercase tracking-[0.18em] text-white/52">Day</span>
-                <select
-                  className="field"
-                  value={dobDay === "" ? "" : String(dobDay)}
-                  onChange={(event) =>
-                    setDobDay(event.target.value ? Number(event.target.value) : "")
-                  }
-                  aria-label="Birth day"
-                >
-                  <option value="">Day</option>
-                  {Array.from({ length: dayOptionsCount }, (_, idx) => idx + 1).map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1 text-sm font-bold text-white/84">
-                <span className="text-xs uppercase tracking-[0.18em] text-white/52">Year</span>
-                <select
-                  className="field"
-                  value={dobYear === "" ? "" : String(dobYear)}
-                  onChange={(event) =>
-                    setDobYear(event.target.value ? Number(event.target.value) : "")
-                  }
-                  aria-label="Birth year"
-                >
-                  <option value="">Year</option>
-                  {yearOptions.map((y) => (
-                    <option key={y} value={y}>
-                      {y}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <label className="grid gap-1 text-sm font-bold text-white/84">
+              <span className="text-xs uppercase tracking-[0.18em] text-white/52">Date of birth</span>
+              <input
+                type="date"
+                className="field date-field text-lg"
+                value={dob}
+                onChange={(event) => setDob(event.target.value)}
+                min={dobMinIso}
+                max={dobMaxIso}
+                autoFocus
+                aria-label="Date of birth"
+              />
+            </label>
             {ageIsValid ? (
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/52">
-                You&apos;ll be shown as {ageNumber}
+                {formatDobDisplay(dob)} · you&apos;ll be shown as {ageNumber}
               </p>
             ) : null}
           </StepLayout>
