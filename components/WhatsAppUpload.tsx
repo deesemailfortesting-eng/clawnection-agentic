@@ -53,8 +53,7 @@ function formatPct(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
-const fieldClass =
-  "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100";
+const fieldClass = "input-obsidian mt-1";
 
 export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUploadProps) {
   const [state, setState] = useState<UploadState>({ status: "idle" });
@@ -152,60 +151,60 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
     return (
       <div className="space-y-4">
         {/* Per-file breakdown */}
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Files processed</p>
+        <div className="card-obsidian space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Files processed</p>
           {fileResults.map(({ fileName, signals: fs }) => {
             const pct = totalUserMsgs > 0 ? Math.round((fs.userMessageCount / totalUserMsgs) * 100) : 0;
             return (
               <div key={fileName} className="flex items-center gap-3 text-sm">
-                <span className="truncate max-w-[200px] text-zinc-700">{fileName}</span>
-                <span className="text-zinc-400">{fs.userMessageCount.toLocaleString()} msgs</span>
-                <div className="flex-1 h-1.5 rounded-full bg-zinc-200 overflow-hidden">
-                  <div className="h-full rounded-full bg-rose-400" style={{ width: `${pct}%` }} />
+                <span className="truncate max-w-[200px] text-[var(--text-secondary)]">{fileName}</span>
+                <span className="text-[var(--text-muted)]">{fs.userMessageCount.toLocaleString()} msgs</span>
+                <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-elevated)]">
+                  <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
                 </div>
-                <span className="text-xs text-zinc-400 w-8 text-right">{pct}%</span>
+                <span className="w-8 text-right text-xs text-[var(--text-muted)]">{pct}%</span>
               </div>
             );
           })}
         </div>
 
         {/* Combined signal preview */}
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-emerald-600 font-semibold text-sm">Combined analysis</span>
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+        <div className="card-obsidian border-emerald-500/25 bg-emerald-950/20 p-5 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-emerald-200">Combined analysis</span>
+            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-100 ring-1 ring-emerald-400/30">
               {s.userMessageCount.toLocaleString()} messages · {fileResults.length} chat{fileResults.length > 1 ? "s" : ""}
             </span>
             {s.isLowConfidence && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-100 ring-1 ring-amber-400/30">
                 low confidence
               </span>
             )}
           </div>
 
           <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-            <div><span className="text-zinc-500">Response speed</span><span className="ml-2 font-medium text-zinc-800">{formatLatency(s.avgResponseLatencyMs)}</span></div>
-            <div><span className="text-zinc-500">Starts conversations</span><span className="ml-2 font-medium text-zinc-800">{formatPct(s.initiationRatio)}</span></div>
-            <div><span className="text-zinc-500">Detailed messages</span><span className="ml-2 font-medium text-zinc-800">{formatPct(s.longMessageRatio)}</span></div>
-            <div><span className="text-zinc-500">Emoji density</span><span className="ml-2 font-medium text-zinc-800">{s.emojiDensity.toFixed(1)}/msg</span></div>
-            <div><span className="text-zinc-500">Active hours</span><span className="ml-2 font-medium text-zinc-800">{s.activeHoursProfile}</span></div>
-            <div><span className="text-zinc-500">Derived style</span><span className="ml-2 font-medium text-zinc-800">{s.derivedCommunicationStyle}</span></div>
-            <div><span className="text-zinc-500">Signal confidence</span><span className="ml-2 font-medium text-zinc-800">{s.signalFamilyMetadata.communicationStyle.confidence}</span></div>
-            <div><span className="text-zinc-500">Source coverage</span><span className="ml-2 font-medium text-zinc-800">{s.extractionMetadata.fileCount} file{ s.extractionMetadata.fileCount > 1 ? "s" : "" } · {s.extractionMetadata.detectedFormats.join(", ")}</span></div>
-            <div><span className="text-zinc-500">Eligible conversations</span><span className="ml-2 font-medium text-zinc-800">{s.coverageSummary.eligibleConversationCount}/{s.coverageSummary.conversationCount}</span></div>
-            <div><span className="text-zinc-500">Coverage quality</span><span className="ml-2 font-medium text-zinc-800">{s.coverageSummary.coverageQuality}</span></div>
+            <div><span className="text-[var(--text-muted)]">Response speed</span><span className="ml-2 font-medium text-[var(--text-primary)]">{formatLatency(s.avgResponseLatencyMs)}</span></div>
+            <div><span className="text-[var(--text-muted)]">Starts conversations</span><span className="ml-2 font-medium text-[var(--text-primary)]">{formatPct(s.initiationRatio)}</span></div>
+            <div><span className="text-[var(--text-muted)]">Detailed messages</span><span className="ml-2 font-medium text-[var(--text-primary)]">{formatPct(s.longMessageRatio)}</span></div>
+            <div><span className="text-[var(--text-muted)]">Emoji density</span><span className="ml-2 font-medium text-[var(--text-primary)]">{s.emojiDensity.toFixed(1)}/msg</span></div>
+            <div><span className="text-[var(--text-muted)]">Active hours</span><span className="ml-2 font-medium text-[var(--text-primary)]">{s.activeHoursProfile}</span></div>
+            <div><span className="text-[var(--text-muted)]">Derived style</span><span className="ml-2 font-medium text-[var(--text-primary)]">{s.derivedCommunicationStyle}</span></div>
+            <div><span className="text-[var(--text-muted)]">Signal confidence</span><span className="ml-2 font-medium text-[var(--text-primary)]">{s.signalFamilyMetadata.communicationStyle.confidence}</span></div>
+            <div><span className="text-[var(--text-muted)]">Source coverage</span><span className="ml-2 font-medium text-[var(--text-primary)]">{s.extractionMetadata.fileCount} file{ s.extractionMetadata.fileCount > 1 ? "s" : "" } · {s.extractionMetadata.detectedFormats.join(", ")}</span></div>
+            <div><span className="text-[var(--text-muted)]">Eligible conversations</span><span className="ml-2 font-medium text-[var(--text-primary)]">{s.coverageSummary.eligibleConversationCount}/{s.coverageSummary.conversationCount}</span></div>
+            <div><span className="text-[var(--text-muted)]">Coverage quality</span><span className="ml-2 font-medium text-[var(--text-primary)]">{s.coverageSummary.coverageQuality}</span></div>
           </div>
 
-          <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-zinc-700">
-            <p className="font-medium text-zinc-900">Safe summary candidates</p>
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+            <p className="font-medium text-[var(--text-primary)]">Safe summary candidates</p>
             <div className="mt-2 space-y-2">
               {s.shareableSummary.map((summary) => (
                 <div key={summary.label} className="flex items-start justify-between gap-4">
                   <div>
-                    <span className="text-zinc-500">{summary.label}</span>
-                    <span className="ml-2 font-medium text-zinc-800">{summary.value}</span>
+                    <span className="text-[var(--text-muted)]">{summary.label}</span>
+                    <span className="ml-2 font-medium text-[var(--text-primary)]">{summary.value}</span>
                   </div>
-                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-100 ring-1 ring-emerald-400/30">
                     {summary.confidence}
                   </span>
                 </div>
@@ -214,18 +213,18 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
           </div>
 
           {s.conversationProfiles.length > 0 && (
-            <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700">
-              <p className="font-medium text-zinc-900">Conversation coverage</p>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+              <p className="font-medium text-[var(--text-primary)]">Conversation coverage</p>
               <div className="mt-2 space-y-2">
                 {s.conversationProfiles.map((profile) => (
-                  <div key={profile.conversationId} className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-2 last:border-b-0 last:pb-0">
+                  <div key={profile.conversationId} className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] pb-2 last:border-b-0 last:pb-0">
                     <div>
-                      <p className="font-medium text-zinc-800">{profile.conversationId}</p>
-                      <p className="text-zinc-500">
+                      <p className="font-medium text-[var(--text-primary)]">{profile.conversationId}</p>
+                      <p className="text-[var(--text-muted)]">
                         {profile.coverage.messageCount} messages · {profile.coverage.activeDays} active day{profile.coverage.activeDays === 1 ? "" : "s"} · {profile.inferredRelationshipType}
                       </p>
                     </div>
-                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700">
+                    <span className="rounded-full bg-[var(--surface-base)] px-2 py-0.5 text-xs text-[var(--text-secondary)] ring-1 ring-[var(--border-subtle)]">
                       {profile.coverage.confidence}
                     </span>
                   </div>
@@ -235,7 +234,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
           )}
 
           {!s.isLowConfidence && changedFields.length > 0 ? (
-            <div className="rounded-xl border border-emerald-300 bg-white px-4 py-3 text-sm text-zinc-700">
+            <div className="rounded-xl border border-emerald-500/30 bg-[var(--surface-elevated)] px-4 py-3 text-sm text-[var(--text-secondary)]">
               <span className="font-medium">Will update: </span>
               {changedFields.map((f, i) => {
                 const before = f === "communicationStyle"
@@ -253,7 +252,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
               })}
             </div>
           ) : changedFields.length === 0 ? (
-            <p className="text-sm text-zinc-500">Your stated attributes already match the behavioral data — no field updates needed.</p>
+            <p className="text-sm text-[var(--text-muted)]">Your stated attributes already match the behavioral data — no field updates needed.</p>
           ) : null}
         </div>
 
@@ -261,21 +260,21 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
           <button
             type="button"
             onClick={() => onApply(state.updatedProfile, state.mergedSignals, state.gap)}
-            className="flex-1 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+            className="btn-primary flex-1 touch-target"
           >
             Apply to profile
           </button>
           <button
             type="button"
             onClick={() => setState({ status: "idle" })}
-            className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm text-zinc-600 transition hover:border-zinc-400"
+            className="btn-secondary touch-target px-4 py-2.5 text-sm"
           >
             Re-upload
           </button>
           <button
             type="button"
             onClick={onSkip}
-            className="rounded-xl border border-zinc-300 px-4 py-2.5 text-sm text-zinc-600 transition hover:border-zinc-400"
+            className="btn-secondary touch-target px-4 py-2.5 text-sm"
           >
             Skip
           </button>
@@ -286,28 +285,28 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700 space-y-3">
+      <div className="card-obsidian space-y-3 text-sm text-[var(--text-secondary)]">
         <div>
-          <p className="font-medium text-zinc-900">WhatsApp consent</p>
-          <p className="mt-1 text-zinc-600">
-            Uploading a WhatsApp export lets Clawnection extract behavioral signals from your messages, such as response rhythm,
+          <p className="font-medium text-[var(--text-primary)]">WhatsApp consent</p>
+          <p className="mt-1">
+            Uploading a WhatsApp export lets WTF Radar extract behavioral signals from your messages, such as response rhythm,
             message depth, emoji use, and active hours.
           </p>
         </div>
 
-        <ul className="space-y-1 text-zinc-600">
+        <ul className="list-disc space-y-1 pl-5">
           <li>Used internally: your uploaded chats are analyzed to derive behavioral signals and compare them to your stated profile.</li>
           <li>Surfaced to you: only summary metrics and profile updates are shown in this flow, not raw transcript excerpts.</li>
           <li>Storage in this MVP: data is processed in your browser and saved locally on this device via browser storage.</li>
           <li>Revocation in this MVP: you can clear your browser storage later to remove saved profile and signal data from this prototype.</li>
         </ul>
 
-        <label className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-700">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-3 text-sm">
           <input
             type="checkbox"
             checked={hasAcceptedConsent}
             onChange={(e) => setHasAcceptedConsent(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-zinc-300 text-rose-500 focus:ring-rose-300"
+            className="mt-1 h-4 w-4 rounded border-[var(--border-strong)] text-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]"
           />
           <span>
             I consent to analyzing this WhatsApp export for behavioral matchmaking signals in this prototype.
@@ -316,7 +315,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
       </div>
 
       <div>
-        <label className="text-sm text-zinc-700">
+        <label className="block text-sm text-[var(--text-secondary)]">
           Your name in the chats
           <input
             className={fieldClass}
@@ -325,7 +324,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
             placeholder="e.g. Maya, or +1 617-555-0100"
           />
         </label>
-        <p className="mt-1 text-xs text-zinc-400">
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
           Must match exactly how you appear as a sender in the export. Open one .txt to check if unsure.
         </p>
       </div>
@@ -333,8 +332,8 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
       <div
         className={`rounded-2xl border-2 border-dashed p-8 text-center transition ${
           canUpload
-            ? "cursor-pointer border-zinc-300 bg-zinc-50 hover:border-rose-300 hover:bg-rose-50"
-            : "cursor-not-allowed border-zinc-200 bg-zinc-100 text-zinc-400"
+            ? "cursor-pointer border-[var(--border-strong)] bg-[var(--surface-elevated)] hover:border-[var(--accent)]/50"
+            : "cursor-not-allowed border-[var(--border-subtle)] bg-[var(--surface-base)] text-[var(--text-muted)]"
         }`}
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
@@ -359,13 +358,13 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
           onChange={handleFileChange}
         />
         {state.status === "loading" ? (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-[var(--text-muted)]">
             Analysing file {state.processed + 1} of {state.total}…
           </p>
         ) : (
           <>
-            <p className="text-sm font-medium text-zinc-700">Drop your WhatsApp exports here</p>
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="text-sm font-medium text-[var(--text-primary)]">Drop your WhatsApp exports here</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
               {hasAcceptedConsent
                 ? "Select multiple files at once · .txt or .zip · signals are merged weighted by message count"
                 : "Accept the consent terms above to enable upload"}
@@ -375,7 +374,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
       </div>
 
       {state.status === "error" && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 whitespace-pre-line">
+        <div className="whitespace-pre-line rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-sm text-[var(--danger-text)]">
           {state.message}
         </div>
       )}
@@ -384,7 +383,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
         <button
           type="button"
           onClick={onSkip}
-          className="text-sm text-zinc-400 underline underline-offset-2 hover:text-zinc-600"
+          className="text-sm text-[var(--text-muted)] underline underline-offset-2 hover:text-[var(--text-secondary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         >
           Skip this step
         </button>

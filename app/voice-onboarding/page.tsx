@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
+import { AppHeader } from "@/components/AppHeader";
+import { PhoneShell } from "@/components/PhoneShell";
 import { saveProfile, syncProfileToServer } from "@/lib/storage";
 import { CommunicationStyle, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
 
@@ -30,10 +33,57 @@ type ProfileData = {
   agentType?: RomanticProfile["agentType"];
 };
 
+type TranscriptLine = { id: string; role: "assistant" | "user" | "system"; text: string };
+
+function extractTranscriptText(message: Record<string, unknown>): string | null {
+  if (typeof message.transcript === "string" && message.transcript.trim()) {
+    return message.transcript.trim();
+  }
+  if (typeof message.text === "string" && message.text.trim() && !message.text.includes("PROFILE_DATA:")) {
+    return message.text.trim();
+  }
+  const content = message.content;
+  if (typeof content === "string" && content.trim()) return content.trim();
+  if (Array.isArray(content)) {
+    const parts = content
+      .map((c) => {
+        if (typeof c === "object" && c && "text" in c && typeof (c as { text?: string }).text === "string") {
+          return (c as { text: string }).text;
+        }
+        return "";
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join(" ").trim();
+  }
+  return null;
+}
+
+function roleFromMessage(message: Record<string, unknown>): TranscriptLine["role"] {
+  const role = message.role;
+  if (role === "user" || role === "assistant" || role === "system") return role;
+  const type = message.type;
+  if (type === "transcript" || type === "speech-update" || type === "conversation-update") {
+    if (message.assistant === true || message.speaker === "assistant") return "assistant";
+    if (message.user === true || message.speaker === "user") return "user";
+  }
+  return "assistant";
+}
+
 export default function VoiceOnboardingPage() {
   const router = useRouter();
+  const vapiConfigError =
+    typeof process.env.NEXT_PUBLIC_VAPI_API_KEY === "string" && process.env.NEXT_PUBLIC_VAPI_API_KEY.length > 0
+      ? null
+      : "Voice onboarding is not configured. NEXT_PUBLIC_VAPI_API_KEY is missing.";
   const vapiRef = useRef<Vapi | null>(null);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const nameFieldId = useId();
+  const genderFieldId = useId();
+  const prefFieldId = useId();
+
   const [isCallActive, setIsCallActive] = useState(false);
+  const [micMuted, setMicMuted] = useState(false);
+  const [assistantSpeaking, setAssistantSpeaking] = useState(false);
   const [profile, setProfile] = useState<ProfileData>({});
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +93,9 @@ export default function VoiceOnboardingPage() {
     sexualPreference: "",
   });
   const [showPreCallForm, setShowPreCallForm] = useState(true);
+  const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
+  const [liveStatus, setLiveStatus] = useState("");
 
-  // Stable ref so processAndSaveProfile always sees latest profile state
   const profileRef = useRef<ProfileData>({});
 
   useEffect(() => {
@@ -52,86 +103,140 @@ export default function VoiceOnboardingPage() {
   }, [profile]);
 
   useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcript]);
+
+  const appendTranscript = useCallback((role: TranscriptLine["role"], text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setTranscript((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.role === role && trimmed.length < 400 && last.text.endsWith(trimmed.slice(0, 12))) {
+        return prev;
+      }
+      return [...prev, { id: crypto.randomUUID(), role, text: trimmed }];
+    });
+  }, []);
+
+  const processAndSaveProfile = useCallback(
+    (data: ProfileData) => {
+      if (!data.name || !data.age || !data.location || !data.bio) return;
+
+      const romanticProfile: RomanticProfile = {
+        id: `voice-${crypto.randomUUID()}`,
+        name: data.name,
+        age: data.age,
+        genderIdentity: data.genderIdentity || "",
+        lookingFor: data.lookingFor || "",
+        location: data.location,
+        relationshipIntent: data.relationshipIntent || "long-term",
+        bio: data.bio,
+        interests: data.interests || [],
+        values: data.values || [],
+        communicationStyle: data.communicationStyle || "balanced",
+        lifestyleHabits: {
+          sleepSchedule: data.sleepSchedule || "flexible",
+          socialEnergy: data.socialEnergy || "balanced",
+          activityLevel: data.activityLevel || "active",
+          drinking: data.drinking || "social",
+          smoking: data.smoking || "never",
+        },
+        dealbreakers: data.dealbreakers || [],
+        idealFirstDate: data.idealFirstDate || "",
+        preferenceAgeRange: {
+          min: data.preferenceMinAge || 24,
+          max: data.preferenceMaxAge || 38,
+        },
+        preferenceNotes: data.preferenceNotes || "",
+        agentType: data.agentType || "hosted",
+      };
+
+      saveProfile(romanticProfile);
+      syncProfileToServer(romanticProfile);
+      setIsComplete(true);
+      setTimeout(() => router.push("/demo"), 2000);
+    },
+    [router],
+  );
+
+  useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
     if (!apiKey) {
-      setError("Voice onboarding is not configured. NEXT_PUBLIC_VAPI_API_KEY is missing.");
       return;
     }
 
     vapiRef.current = new Vapi(apiKey);
     const vapi = vapiRef.current;
 
-    vapi.on("call-start", () => setIsCallActive(true));
+    vapi.on("call-start", () => {
+      setIsCallActive(true);
+      const muted = vapi.isMuted();
+      setMicMuted(muted);
+      setLiveStatus(
+        muted
+          ? "Call connected. Your microphone is muted; unmute when you want to speak."
+          : "Call connected. Your microphone is active unless you mute it.",
+      );
+      appendTranscript("system", "Call connected. The assistant speaks aloud; captions appear below as text arrives.");
+    });
 
     vapi.on("call-end", () => {
       setIsCallActive(false);
+      setAssistantSpeaking(false);
+      setLiveStatus("Call ended.");
+      appendTranscript("system", "Call ended.");
       processAndSaveProfile(profileRef.current);
     });
 
-    vapi.on("message", (message: any) => {
-      const text = message.text || "";
-      const jsonMatch = text.match(/PROFILE_DATA:\s*(\{.*\})/);
+    vapi.on("message", (message: unknown) => {
+      if (!message || typeof message !== "object") return;
+      const m = message as Record<string, unknown>;
+      const textField = typeof m.text === "string" ? m.text : "";
+      const jsonMatch = textField.match(/PROFILE_DATA:\s*(\{.*\})/);
       if (jsonMatch) {
         try {
-          const data = JSON.parse(jsonMatch[1]);
+          const data = JSON.parse(jsonMatch[1]!) as ProfileData;
           setProfile(data);
           profileRef.current = data;
         } catch {
-          // malformed JSON from assistant — ignore
+          /* malformed JSON */
         }
+        return;
+      }
+
+      const line = extractTranscriptText(m);
+      if (line) {
+        appendTranscript(roleFromMessage(m), line);
       }
     });
 
-    vapi.on("error", (err: any) => {
-      console.error("Vapi error:", err);
-      setIsCallActive(false);
+    vapi.on("speech-start", () => {
+      setAssistantSpeaking(true);
+      setLiveStatus("Assistant audio is playing. Text equivalents appear in the transcript when available.");
     });
 
-    return () => { vapi.stop(); };
-  }, []);
+    vapi.on("speech-end", () => {
+      setAssistantSpeaking(false);
+      setLiveStatus("You can speak when ready. The microphone stays on unless you mute it.");
+    });
 
-  function processAndSaveProfile(data: ProfileData) {
-    if (!data.name || !data.age || !data.location || !data.bio) return;
+    vapi.on("error", () => {
+      setIsCallActive(false);
+      setAssistantSpeaking(false);
+    });
 
-    const romanticProfile: RomanticProfile = {
-      id: `voice-${crypto.randomUUID()}`,
-      name: data.name,
-      age: data.age,
-      genderIdentity: data.genderIdentity || "",
-      lookingFor: data.lookingFor || "",
-      location: data.location,
-      relationshipIntent: data.relationshipIntent || "long-term",
-      bio: data.bio,
-      interests: data.interests || [],
-      values: data.values || [],
-      communicationStyle: data.communicationStyle || "balanced",
-      lifestyleHabits: {
-        sleepSchedule: data.sleepSchedule || "flexible",
-        socialEnergy: data.socialEnergy || "balanced",
-        activityLevel: data.activityLevel || "active",
-        drinking: data.drinking || "social",
-        smoking: data.smoking || "never",
-      },
-      dealbreakers: data.dealbreakers || [],
-      idealFirstDate: data.idealFirstDate || "",
-      preferenceAgeRange: {
-        min: data.preferenceMinAge || 24,
-        max: data.preferenceMaxAge || 38,
-      },
-      preferenceNotes: data.preferenceNotes || "",
-      agentType: data.agentType || "hosted",
+    return () => {
+      void vapi.stop();
     };
-
-    saveProfile(romanticProfile);
-    // Persist to Cloudflare D1 in the background
-    syncProfileToServer(romanticProfile);
-    setIsComplete(true);
-    setTimeout(() => router.push("/demo"), 2000);
-  }
+  }, [appendTranscript, processAndSaveProfile]);
 
   async function startVoiceOnboarding() {
+    if (vapiConfigError) {
+      setError(vapiConfigError);
+      return;
+    }
     if (!vapiRef.current) {
-      setError("Vapi not initialized — check NEXT_PUBLIC_VAPI_API_KEY.");
+      setError("Voice client is not ready. Check NEXT_PUBLIC_VAPI_API_KEY.");
       return;
     }
     if (!preCallData.name || !preCallData.gender || !preCallData.sexualPreference) {
@@ -146,80 +251,154 @@ export default function VoiceOnboardingPage() {
     }
 
     setError(null);
+    setTranscript([]);
+    setMicMuted(false);
 
-    // Auto-terminate after 30 minutes
-    setTimeout(() => { vapiRef.current?.stop(); }, 30 * 60 * 1000);
+    setTimeout(() => {
+      vapiRef.current?.stop();
+    }, 30 * 60 * 1000);
+
+    const firstMessage = `Hey ${preCallData.name} — WTF Radar here. I can see from what you shared that you identify as ${preCallData.gender} and your dating preference is ${preCallData.sexualPreference}. Before we get going, just so you know what this is: we're gonna talk for however long feels right. After this, I spin up a version of you that goes and chats with other people's agents — and when yours genuinely clicks with someone, we set up a real meet. So this is just… you and me, for a bit. No form, no right answers. Where are you right now — like, physically, what room are you in?`;
 
     try {
-      const firstMessage = `Hey ${preCallData.name} — Clawnection here. I can see from what you shared that you identify as ${preCallData.gender} and your sexual preference is ${preCallData.sexualPreference}. Before we get going, just so you know what this is: we're gonna talk for however long feels right. After this, I spin up a version of you that goes and chats with other people's agents — and when yours genuinely clicks with someone, we set up a real meet. So this is just… you and me, for a bit. No form, no right answers. Where are you right now — like, physically, what room are you in?`;
+      appendTranscript("assistant", firstMessage);
       await vapiRef.current.start(assistantId, { firstMessage });
       setShowPreCallForm(false);
-    } catch (err) {
-      setError("Failed to start the call. Check your Vapi credentials.");
+    } catch {
+      setError("Failed to start the call. Check your Vapi credentials and microphone permission.");
     }
   }
 
+  function toggleMute() {
+    const vapi = vapiRef.current;
+    if (!vapi || !isCallActive) return;
+    const currentlyMuted = vapi.isMuted();
+    const nextMuted = !currentlyMuted;
+    vapi.setMuted(nextMuted);
+    setMicMuted(nextMuted);
+    setLiveStatus(
+      nextMuted
+        ? "Microphone muted. Unmute when you want the assistant to hear you."
+        : "Microphone active. The assistant can hear you.",
+    );
+    appendTranscript("system", nextMuted ? "You muted your microphone." : "You unmuted your microphone.");
+  }
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-white px-6 py-10">
-      <div className="mx-auto max-w-2xl space-y-6">
-        <header className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Voice Onboarding</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">Build your romance profile with voice</h1>
-          <p className="text-sm leading-6 text-zinc-600">
-            Chat with our AI assistant to create your profile. Just speak naturally — we'll guide you through everything.
+    <PhoneShell label="Voice profile onboarding">
+      <AppHeader />
+      <div className="flex flex-1 flex-col gap-6 pb-8">
+        <header className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">Voice onboarding</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Build your profile by voice</h1>
+          <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+            You will use your device microphone. The assistant replies with audio; we show on-screen text whenever the
+            platform sends captions or messages so you are not relying on sound alone.
           </p>
         </header>
 
-        {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
+        {vapiConfigError || error ? (
+          <div className="rounded-xl border border-[var(--danger-border)] bg-[var(--danger-bg)] px-4 py-3 text-sm text-[var(--danger-text)]" role="alert">
+            {vapiConfigError ?? error}
           </div>
-        )}
+        ) : null}
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-6">
-          {showPreCallForm && !isCallActive && !isComplete && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-zinc-900 mb-2">Before we start chatting…</h2>
-                <p className="text-sm text-zinc-600">This helps our AI assistant have a more personalised conversation.</p>
+        <section className="card-obsidian" aria-labelledby="voice-session-heading">
+          <h2 id="voice-session-heading" className="text-base font-semibold text-[var(--text-primary)]">
+            Voice session
+          </h2>
+
+          <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
+            <span
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
+                isCallActive
+                  ? micMuted
+                    ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-500/40"
+                    : "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/40"
+                  : "bg-[var(--surface-elevated)] text-[var(--text-muted)] ring-1 ring-[var(--border-subtle)]"
+              }`}
+            >
+              <span className="relative flex h-2 w-2" aria-hidden="true">
+                {isCallActive && !micMuted ? (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                ) : null}
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${
+                    isCallActive ? (micMuted ? "bg-amber-400" : "bg-emerald-400") : "bg-zinc-500"
+                  }`}
+                />
+              </span>
+              {isCallActive ? (micMuted ? "Microphone muted" : "Microphone active") : "Microphone off (no active call)"}
+            </span>
+            {isCallActive ? (
+              <span
+                className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium ring-1 ${
+                  assistantSpeaking
+                    ? "bg-[var(--accent-soft)] text-[var(--text-primary)] ring-[var(--accent)]/50"
+                    : "bg-[var(--surface-elevated)] text-[var(--text-muted)] ring-[var(--border-subtle)]"
+                }`}
+              >
+                {assistantSpeaking ? "Assistant audio playing" : "Assistant audio idle"}
+              </span>
+            ) : null}
+          </div>
+
+          <p className="sr-only" aria-live="assertive">
+            {liveStatus}
+          </p>
+          <p className="mt-2 text-xs text-[var(--text-muted)]" aria-hidden="true">
+            {liveStatus}
+          </p>
+
+          {showPreCallForm && !isCallActive && !isComplete ? (
+            <div className="mt-6 space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Before the call</h3>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  This helps the assistant personalize the conversation. You will be asked to allow microphone access.
+                </p>
               </div>
 
               <div className="space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium text-zinc-700">What's your name?</span>
+                <label className="block text-sm text-[var(--text-secondary)]" htmlFor={nameFieldId}>
+                  What is your name?
                   <input
+                    id={nameFieldId}
                     type="text"
-                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    className="input-obsidian mt-1"
                     value={preCallData.name}
                     onChange={(e) => setPreCallData((p) => ({ ...p, name: e.target.value }))}
-                    placeholder="Enter your name"
+                    autoComplete="name"
+                    placeholder="Your first name"
                   />
                 </label>
 
-                <label className="block">
-                  <span className="text-sm font-medium text-zinc-700">What's your gender?</span>
+                <label className="block text-sm text-[var(--text-secondary)]" htmlFor={genderFieldId}>
+                  How do you describe your gender?
                   <select
-                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    id={genderFieldId}
+                    className="input-obsidian mt-1"
                     value={preCallData.gender}
                     onChange={(e) => setPreCallData((p) => ({ ...p, gender: e.target.value }))}
                   >
-                    <option value="">Select your gender</option>
+                    <option value="">Select an option</option>
                     <option value="woman">Woman</option>
                     <option value="man">Man</option>
                     <option value="non-binary">Non-binary</option>
-                    <option value="other">Other</option>
+                    <option value="other">Another identity</option>
                     <option value="prefer-not-to-say">Prefer not to say</option>
                   </select>
                 </label>
 
-                <label className="block">
-                  <span className="text-sm font-medium text-zinc-700">What's your sexual preference?</span>
+                <label className="block text-sm text-[var(--text-secondary)]" htmlFor={prefFieldId}>
+                  Who are you interested in meeting? (dating orientation)
                   <select
-                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    id={prefFieldId}
+                    className="input-obsidian mt-1"
                     value={preCallData.sexualPreference}
                     onChange={(e) => setPreCallData((p) => ({ ...p, sexualPreference: e.target.value }))}
                   >
-                    <option value="">Select your preference</option>
+                    <option value="">Select an option</option>
                     <option value="straight">Straight</option>
                     <option value="gay">Gay</option>
                     <option value="lesbian">Lesbian</option>
@@ -234,55 +413,91 @@ export default function VoiceOnboardingPage() {
               </div>
 
               <button
-                onClick={startVoiceOnboarding}
-                disabled={!preCallData.name || !preCallData.gender || !preCallData.sexualPreference}
-                className="w-full rounded-xl bg-rose-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                type="button"
+                onClick={() => void startVoiceOnboarding()}
+                disabled={!!vapiConfigError || !preCallData.name || !preCallData.gender || !preCallData.sexualPreference}
+                className="btn-primary w-full touch-target disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Start Voice Chat
+                Start voice session (enables microphone)
               </button>
 
-              <p className="text-center text-xs text-zinc-500">
-                Automatically ends after 30 minutes. You can end early at any time.
+              <p className="text-center text-xs text-[var(--text-muted)]">
+                The session ends automatically after 30 minutes. You can end it early at any time.
               </p>
             </div>
-          )}
+          ) : null}
 
-          {isCallActive && (
-            <div className="space-y-4 text-center">
-              <div className="inline-flex items-center gap-2">
-                <div className="h-3 w-3 animate-pulse rounded-full bg-green-500" />
-                <p className="text-sm font-medium text-zinc-900">Call in progress</p>
+          {isCallActive ? (
+            <div className="mt-6 space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Speak naturally. Use mute if you need privacy; unmute when you are ready to respond.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={toggleMute}
+                    className="btn-secondary touch-target min-w-[44px] flex-1 sm:flex-none"
+                    aria-pressed={micMuted}
+                  >
+                    {micMuted ? "Unmute microphone" : "Mute microphone"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void vapiRef.current?.stop()}
+                    className="btn-secondary touch-target min-w-[44px] flex-1 border-red-500/40 text-red-200 sm:flex-none"
+                  >
+                    End voice session
+                  </button>
+                </div>
               </div>
-              <p className="text-sm text-zinc-600">
-                Speak naturally. We'll collect your profile information through conversation.
-              </p>
-              <button
-                onClick={() => vapiRef.current?.stop()}
-                className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-300"
+
+              <div
+                className="max-h-64 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-3"
+                role="log"
+                aria-relevant="additions"
+                aria-label="Conversation transcript"
               >
-                End Call
-              </button>
-            </div>
-          )}
-
-          {isComplete && (
-            <div className="space-y-2 text-center">
-              <div className="inline-flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-green-500" />
-                <p className="text-sm font-medium text-zinc-900">Profile created and saved!</p>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">On-screen transcript</h3>
+                <ul className="mt-2 space-y-2">
+                  {transcript.length === 0 ? (
+                    <li className="text-sm text-[var(--text-muted)]">
+                      Waiting for captions from the assistant. If nothing appears, you can still follow the spoken prompts;
+                      contact support for reasonable accommodations if you need a fully captioned flow.
+                    </li>
+                  ) : (
+                    transcript.map((line) => (
+                      <li key={line.id} className="text-sm leading-relaxed text-[var(--text-secondary)]">
+                        <span className="font-semibold text-[var(--text-primary)]">
+                          {line.role === "assistant" ? "Assistant" : line.role === "user" ? "You" : "System"}
+                          :{" "}
+                        </span>
+                        {line.text}
+                      </li>
+                    ))
+                  )}
+                  <div ref={transcriptEndRef} />
+                </ul>
               </div>
-              <p className="text-sm text-zinc-600">Redirecting to the demo…</p>
             </div>
-          )}
-        </div>
+          ) : null}
 
-        <p className="text-center text-xs text-zinc-500">
-          Prefer to fill out the form manually?{" "}
-          <a href="/onboarding" className="text-rose-500 hover:text-rose-600">
-            Go to text onboarding
-          </a>
+          {isComplete ? (
+            <div className="mt-6 space-y-2 text-center">
+              <p className="text-sm font-medium text-[var(--text-primary)]">Profile saved</p>
+              <p className="text-sm text-[var(--text-secondary)]">Opening the sample match screen…</p>
+            </div>
+          ) : null}
+        </section>
+
+        <p className="text-center text-sm text-[var(--text-secondary)]">
+          Prefer the form?{" "}
+          <Link href="/onboarding" className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline">
+            Open text-based profile onboarding
+          </Link>
+          .
         </p>
       </div>
-    </main>
+    </PhoneShell>
   );
 }

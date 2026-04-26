@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ProfileCard } from "@/components/ProfileCard";
+import { AppHeader } from "@/components/AppHeader";
+import { PhoneShell } from "@/components/PhoneShell";
 import { sampleProfiles } from "@/lib/data/sampleProfiles";
 import { runVirtualDateSimulation } from "@/lib/matching/virtualDate";
 import { loadProfile, saveResult, syncResultToServer } from "@/lib/storage";
@@ -36,40 +38,57 @@ export default function DemoPage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-6 py-10">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <PhoneShell label="Sample virtual introduction">
+      <AppHeader />
+      <div className="flex flex-1 flex-col gap-6 pb-8">
         <header className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Demo Match</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">Run a virtual date simulation</h1>
-          <p className="text-sm text-zinc-600">Choose a counterpart profile, then let both personal agents run the six-round protocol.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">Sample match</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Run a virtual introduction</h1>
+          <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+            Pick a sample profile, then run the six-round protocol between your saved profile and the sample.
+          </p>
         </header>
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          {profile ? <ProfileCard profile={profile} title="Your Profile" subtitle="Loaded from localStorage" /> : null}
-          <div className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <label className="text-sm font-medium text-zinc-800">
-              Choose counterpart
-              <select
-                className="mt-2 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
-                value={selectedId}
-                onChange={(event) => setSelectedId(event.target.value)}
-              >
-                {sampleProfiles.map((option) => (
-                  <option key={option.id} value={option.id}>{option.name} · {option.agentType === "hosted" ? "Hosted" : "External/Mock"}</option>
-                ))}
-              </select>
-            </label>
-            <ProfileCard profile={counterpart} title="Counterpart" compact />
-            <button
-              onClick={runSimulation}
-              disabled={!profile}
-              className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400"
+        <section className="space-y-4" aria-labelledby="your-profile-heading">
+          <h2 id="your-profile-heading" className="text-sm font-semibold text-[var(--text-primary)]">
+            Your saved profile
+          </h2>
+          {profile ? (
+            <ProfileCard profile={profile} title="You" subtitle="Loaded from this device" />
+          ) : (
+            <p className="text-sm text-[var(--text-muted)]">Loading profile…</p>
+          )}
+        </section>
+
+        <section className="card-obsidian space-y-4" aria-labelledby="counterpart-heading">
+          <h2 id="counterpart-heading" className="text-sm font-semibold text-[var(--text-primary)]">
+            Sample counterpart
+          </h2>
+          <label className="block text-sm text-[var(--text-secondary)]">
+            Choose a sample profile
+            <select
+              className="input-obsidian mt-2"
+              value={selectedId}
+              onChange={(event) => setSelectedId(event.target.value)}
             >
-              Run Virtual Date
-            </button>
-          </div>
-        </div>
+              {sampleProfiles.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name} · {option.agentType === "hosted" ? "Hosted agent" : "External mock agent"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ProfileCard profile={counterpart} title="Counterpart preview" compact />
+          <button
+            type="button"
+            onClick={runSimulation}
+            disabled={!profile}
+            className="btn-primary w-full touch-target disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Run virtual introduction
+          </button>
+        </section>
       </div>
-    </main>
+    </PhoneShell>
   );
 }
