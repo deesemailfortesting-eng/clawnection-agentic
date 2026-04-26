@@ -34,8 +34,10 @@ export async function POST(req: NextRequest) {
   const db = (env as unknown as CloudflareEnv).DB;
   const secret = (env as unknown as CloudflareEnv).VAPI_WEBHOOK_SECRET;
 
+  // If a secret is configured, enforce it. If not set (e.g. VAPI dashboard
+  // doesn't support the header field), allow through so the webhook still works.
   const incoming = req.headers.get("x-vapi-secret") ?? "";
-  if (!secret || !timingSafeEqual(incoming, secret)) {
+  if (secret && !timingSafeEqual(incoming, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
