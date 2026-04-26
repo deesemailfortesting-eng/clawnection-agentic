@@ -32,57 +32,137 @@ type ProfileData = {
   agentType?: RomanticProfile["agentType"];
 };
 
+type BasicProfileForm = {
+  name: string;
+  age: string;
+  genderIdentity: string;
+  location: string;
+  lookingFor: "Men" | "Women" | "Everyone";
+};
+
 const vapiApiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
 const vapiAssistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
-const onboardingFirstMessage = "Hey there! Welcome to the app. What's your first name?";
-const onboardingSystemPrompt = `# ROLE
-You are a fast, friendly, and highly conversational AI onboarding assistant for wtfradar. Guide new users through a frictionless voice sign-up flow.
+const defaultBasicProfile: BasicProfileForm = {
+  name: "",
+  age: "",
+  genderIdentity: "",
+  location: "",
+  lookingFor: "Everyone",
+};
+
+const basicProfileSteps = [
+  {
+    key: "name",
+    eyebrow: "Step 1 of 5",
+    title: "What's your first name?",
+    help: "Use the name you want matches to see.",
+  },
+  {
+    key: "age",
+    eyebrow: "Step 2 of 5",
+    title: "How old are you?",
+    help: "You must be 18 or older to use wtfradar.",
+  },
+  {
+    key: "genderIdentity",
+    eyebrow: "Step 3 of 5",
+    title: "How do you identify?",
+    help: "Choose a quick option or type your own words.",
+  },
+  {
+    key: "location",
+    eyebrow: "Step 4 of 5",
+    title: "What city are you based in right now?",
+    help: "A city is enough. You can keep it broad.",
+  },
+  {
+    key: "lookingFor",
+    eyebrow: "Step 5 of 5",
+    title: "Who would you like to meet?",
+    help: "This helps your agent look in the right direction.",
+  },
+] as const;
+
+function buildBioFirstMessage(name: string) {
+  return `Last step, ${name}! Just talk to me for a few seconds about what you like to do, your hobbies, or what you're looking for, and I'll write a killer bio for you.`;
+}
+
+function buildBioSystemPrompt(basics: BasicProfileForm) {
+  const profilePayload = {
+    name: basics.name,
+    age: Number(basics.age),
+    genderIdentity: basics.genderIdentity,
+    lookingFor: basics.lookingFor,
+    location: basics.location,
+    relationshipIntent: "exploring",
+    bio: "Catchy bio you wrote",
+    interests: [],
+    values: [],
+    communicationStyle: "balanced",
+    sleepSchedule: "flexible",
+    socialEnergy: "balanced",
+    activityLevel: "active",
+    drinking: "social",
+    smoking: "never",
+    dealbreakers: [],
+    idealFirstDate: "",
+    preferenceMinAge: 24,
+    preferenceMaxAge: 38,
+    preferenceNotes: "",
+    agentType: "hosted",
+  };
+
+  return `# ROLE
+You are a fast, friendly, and highly conversational AI onboarding assistant for wtfradar.
 
 # MISSION
-Collect only the user's basic profile information as quickly and effortlessly as possible: first name, age, gender identity, city, and short bio material.
+The normal form already collected the user's basics. Your only job is to collect short bio material and write a catchy dating bio.
 
 # CONVERSATIONAL RULES
 1. Ask exactly one question at a time.
 2. Keep every response to 1-2 short sentences.
 3. Sound natural and casual. Use brief acknowledgements like "Got it," "Awesome," or "Perfect."
 4. Do not repeat everything the user says.
-5. For the bio step, ask them to talk naturally for a few seconds, then write a catchy bio for them.
-
-# STRICT FLOW
-Wait for the user's answer before moving to the next step:
-1. Welcome and name: "Hey there! Welcome to the app. What's your first name?"
-2. Age: "Nice to meet you, [Name]. How old are you?"
-3. Gender: "Got it. And how do you identify?"
-4. Location: "Awesome. What city are you based in right now?"
-5. Bio: "Last step! Just talk to me for a few seconds about what you like to do, your hobbies, or what you're looking for, and I'll write a killer bio for you."
+5. Do not ask for name, age, gender, city, or dating preference. Those are already collected.
 
 # CLOSING AND DATA HANDOFF
 After the user answers the bio prompt:
 1. Create a concise, catchy dating bio based on what they said.
 2. Say exactly: "Perfect. I've set up your profile and your bio looks great. You're all ready to go!"
 3. Send a client-visible message containing PROFILE_DATA followed by minified JSON with this shape:
-{"name":"First name","age":25,"genderIdentity":"User's words","lookingFor":"Everyone","location":"City","relationshipIntent":"exploring","bio":"Catchy bio you wrote","interests":[],"values":[],"communicationStyle":"balanced","sleepSchedule":"flexible","socialEnergy":"balanced","activityLevel":"active","drinking":"social","smoking":"never","dealbreakers":[],"idealFirstDate":"","preferenceMinAge":24,"preferenceMaxAge":38,"preferenceNotes":"","agentType":"hosted"}
+${JSON.stringify(profilePayload)}
 4. End the call.`;
-const onboardingAssistantOverrides = {
-  firstMessage: onboardingFirstMessage,
-  firstMessageMode: "assistant-speaks-first" as const,
-  firstMessageInterruptionsEnabled: false,
-  maxDurationSeconds: 480,
-  endCallMessage: "You're all ready to go!",
-  endCallPhrases: ["You're all ready to go"],
-  model: {
-    provider: "openai" as const,
-    model: "gpt-4o-mini" as const,
-    temperature: 0.4,
-    maxTokens: 180,
-    messages: [
-      {
-        role: "system" as const,
-        content: onboardingSystemPrompt,
-      },
-    ],
-  },
-} satisfies NonNullable<Parameters<Vapi["start"]>[1]>;
+}
+
+function buildBioAssistantOverrides(basics: BasicProfileForm): NonNullable<Parameters<Vapi["start"]>[1]> {
+  return {
+    firstMessage: buildBioFirstMessage(basics.name),
+    firstMessageMode: "assistant-speaks-first",
+    firstMessageInterruptionsEnabled: false,
+    maxDurationSeconds: 240,
+    endCallMessage: "You're all ready to go!",
+    endCallPhrases: ["You're all ready to go"],
+    variableValues: {
+      name: basics.name,
+      age: basics.age,
+      genderIdentity: basics.genderIdentity,
+      location: basics.location,
+      lookingFor: basics.lookingFor,
+    },
+    model: {
+      provider: "openai",
+      model: "gpt-4o-mini",
+      temperature: 0.4,
+      maxTokens: 180,
+      messages: [
+        {
+          role: "system",
+          content: buildBioSystemPrompt(basics),
+        },
+      ],
+    },
+  };
+}
 
 function messageText(message: unknown): string {
   if (typeof message !== "object" || message === null) return "";
@@ -102,6 +182,8 @@ export default function VoiceOnboardingPage() {
   const [error, setError] = useState<string | null>(() =>
     vapiApiKey ? null : "Voice onboarding is not configured. NEXT_PUBLIC_VAPI_API_KEY is missing.",
   );
+  const [basicProfile, setBasicProfile] = useState<BasicProfileForm>(defaultBasicProfile);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   // Stable ref so processAndSaveProfile always sees latest profile state
   const profileRef = useRef<ProfileData>({});
@@ -109,6 +191,45 @@ export default function VoiceOnboardingPage() {
   useEffect(() => {
     profileRef.current = profile;
   }, [profile]);
+
+  const currentStep = basicProfileSteps[currentStepIndex];
+  const isLastBasicStep = currentStepIndex === basicProfileSteps.length - 1;
+  const currentValue = basicProfile[currentStep.key];
+
+  function updateBasicProfile<K extends keyof BasicProfileForm>(key: K, value: BasicProfileForm[K]) {
+    setBasicProfile((prev) => ({ ...prev, [key]: value }));
+    setError(null);
+  }
+
+  function validateCurrentStep(): string | null {
+    const trimmedValue = String(currentValue).trim();
+    if (!trimmedValue) return "Answer this question to continue.";
+
+    if (currentStep.key === "age") {
+      const age = Number(trimmedValue);
+      if (!Number.isInteger(age) || age < 18 || age > 100) {
+        return "Enter an age between 18 and 100.";
+      }
+    }
+
+    return null;
+  }
+
+  function goToNextBasicStep() {
+    const validationError = validateCurrentStep();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setError(null);
+    setCurrentStepIndex((index) => Math.min(index + 1, basicProfileSteps.length - 1));
+  }
+
+  function goToPreviousBasicStep() {
+    setError(null);
+    setCurrentStepIndex((index) => Math.max(index - 1, 0));
+  }
 
   const processAndSaveProfile = useCallback((data: ProfileData) => {
     if (isComplete) return;
@@ -210,7 +331,7 @@ export default function VoiceOnboardingPage() {
     callTimeoutRef.current = setTimeout(() => { vapiRef.current?.stop(); }, 8 * 60 * 1000);
 
     try {
-      await vapiRef.current.start(vapiAssistantId, onboardingAssistantOverrides);
+      await vapiRef.current.start(vapiAssistantId, buildBioAssistantOverrides(basicProfile));
     } catch {
       if (callTimeoutRef.current) {
         clearTimeout(callTimeoutRef.current);
@@ -233,7 +354,7 @@ export default function VoiceOnboardingPage() {
         </header>
 
         {error && (
-          <div role="alert" className="alert-panel px-4 py-3 text-sm">
+          <div role="alert" className="alert-message rounded-2xl px-4 py-3 text-sm">
             {error}
           </div>
         )}
@@ -260,29 +381,128 @@ export default function VoiceOnboardingPage() {
           {!isCallActive && !isComplete && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 id="voice-flow-title" className="text-xl font-black text-white">Before the call</h2>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-white/44">{currentStep.eyebrow}</p>
+                <h2 id="voice-flow-title" className="text-2xl font-black tracking-tight text-white">{currentStep.title}</h2>
                 <p className="text-sm leading-6 text-white/64">
-                  No form first. The assistant will ask one short question at a time.
+                  {currentStep.help}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                <h3 className="text-sm font-black text-white">First spoken prompt</h3>
-                <p className="mt-2 text-sm leading-6 text-white/62">
-                  {onboardingFirstMessage}
-                </p>
+              <div className="apple-form-group">
+                <div className="apple-form-row">
+                  {currentStep.key === "name" ? (
+                    <label className="grid gap-2">
+                      <span className="apple-form-label">First name</span>
+                      <input
+                        className="field"
+                        value={basicProfile.name}
+                        onChange={(event) => updateBasicProfile("name", event.target.value)}
+                        placeholder="Maya"
+                        autoComplete="given-name"
+                        autoFocus
+                      />
+                    </label>
+                  ) : null}
+
+                  {currentStep.key === "age" ? (
+                    <label className="grid gap-2">
+                      <span className="apple-form-label">Age</span>
+                      <input
+                        className="field"
+                        value={basicProfile.age}
+                        onChange={(event) => updateBasicProfile("age", event.target.value.replace(/\D/g, "").slice(0, 3))}
+                        placeholder="28"
+                        inputMode="numeric"
+                        autoComplete="bday-year"
+                        autoFocus
+                      />
+                    </label>
+                  ) : null}
+
+                  {currentStep.key === "genderIdentity" ? (
+                    <div className="grid gap-3">
+                      <label className="grid gap-2">
+                        <span className="apple-form-label">Gender identity</span>
+                        <input
+                          className="field"
+                          value={basicProfile.genderIdentity}
+                          onChange={(event) => updateBasicProfile("genderIdentity", event.target.value)}
+                          placeholder="Woman, man, non-binary..."
+                          autoComplete="sex"
+                          autoFocus
+                        />
+                      </label>
+                      <div className="apple-choice-grid" aria-label="Common gender identity options">
+                        {["Woman", "Man", "Non-binary"].map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            className="apple-choice"
+                            data-selected={basicProfile.genderIdentity === option}
+                            onClick={() => updateBasicProfile("genderIdentity", option)}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {currentStep.key === "location" ? (
+                    <label className="grid gap-2">
+                      <span className="apple-form-label">City</span>
+                      <input
+                        className="field"
+                        value={basicProfile.location}
+                        onChange={(event) => updateBasicProfile("location", event.target.value)}
+                        placeholder="Brooklyn"
+                        autoComplete="address-level2"
+                        autoFocus
+                      />
+                    </label>
+                  ) : null}
+
+                  {currentStep.key === "lookingFor" ? (
+                    <div className="grid gap-3">
+                      <span className="apple-form-label">Dating preference</span>
+                      <div className="apple-choice-grid" aria-label="Dating preference options">
+                        {(["Men", "Women", "Everyone"] as const).map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            className="apple-choice"
+                            data-selected={basicProfile.lookingFor === option}
+                            onClick={() => updateBasicProfile("lookingFor", option)}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <button
                 type="button"
-                onClick={startVoiceOnboarding}
+                onClick={isLastBasicStep ? startVoiceOnboarding : goToNextBasicStep}
                 className="primary-button w-full"
               >
-                Start voice onboarding
+                {isLastBasicStep ? "Start voice bio" : "Continue"}
               </button>
 
+              {currentStepIndex > 0 ? (
+                <button
+                  type="button"
+                  onClick={goToPreviousBasicStep}
+                  className="secondary-button w-full"
+                >
+                  Back
+                </button>
+              ) : null}
+
               <p className="text-center text-xs leading-5 text-white/50">
-                Automatically ends after eight minutes. You can end early at any time.
+                Voice starts after these basics. It only asks for your bio.
               </p>
             </div>
           )}
@@ -292,13 +512,13 @@ export default function VoiceOnboardingPage() {
               <div className="space-y-2">
                 <h2 id="voice-flow-title" className="text-xl font-black text-white">Call in progress</h2>
                 <p className="text-sm leading-6 text-white/66">
-                  Speak naturally. The assistant will collect your name, age, gender, city, and a short bio.
+                  Speak naturally. The assistant will only ask for a short bio.
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
                 <h3 className="text-sm font-black text-white">Visual equivalent of the audio prompt</h3>
                 <p className="mt-2 text-sm leading-6 text-white/62">
-                  One question at a time: name, age, gender, city, then a quick bio prompt.
+                  Last step: share what you like to do, your hobbies, or what you are looking for.
                 </p>
               </div>
               <button

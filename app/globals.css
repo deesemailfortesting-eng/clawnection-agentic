@@ -327,6 +327,60 @@ select.field option {
   color: var(--foreground);
 }
 
+.apple-form-group {
+  overflow: hidden;
+  border: 1px solid var(--glass-stroke);
+  border-radius: calc(var(--content-radius) - 6px);
+  background:
+    linear-gradient(145deg, rgba(242, 201, 220, 0.12), rgba(242, 201, 220, 0.045)),
+    rgba(63, 21, 37, 0.50);
+}
+
+.apple-form-row {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.95rem;
+  border-bottom: 1px solid rgba(242, 201, 220, 0.12);
+}
+
+.apple-form-row:last-child {
+  border-bottom: 0;
+}
+
+.apple-form-label {
+  color: rgba(255, 247, 251, 0.72);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.apple-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.apple-choice {
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-stroke);
+  background: rgba(242, 201, 220, 0.08);
+  color: rgba(255, 247, 251, 0.78);
+  font-size: 0.9rem;
+  font-weight: 800;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.apple-choice[data-selected="true"] {
+  border-color: rgba(216, 191, 65, 0.72);
+  background: var(--interactive);
+  color: var(--interactive-foreground);
+  box-shadow: 0 10px 26px rgba(216, 191, 65, 0.18);
+}
+
+.apple-choice:active {
+  transform: scale(0.98);
+}
+
 @media (prefers-contrast: more) {
   :root {
     --glass-fill: rgba(63, 21, 37, 0.92);
