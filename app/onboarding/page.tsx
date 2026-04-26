@@ -26,13 +26,38 @@ type FormState = {
   activityLevel: RomanticProfile["lifestyleHabits"]["activityLevel"];
   drinking: RomanticProfile["lifestyleHabits"]["drinking"];
   smoking: RomanticProfile["lifestyleHabits"]["smoking"];
-  dealbreakers: string;
+  dealbreakers: string[];
+  customDealbreakers: string;
   idealFirstDate: string;
   preferenceMinAge: string;
   preferenceMaxAge: string;
+  partnerPriorities: string[];
+  preferredDynamic: "slow-burn" | "balanced" | "instant-spark";
   preferenceNotes: string;
   agentType: RomanticProfile["agentType"];
 };
+
+const partnerPriorityOptions = [
+  "consistent communication",
+  "emotionally available",
+  "kind",
+  "ambitious",
+  "funny",
+  "family-oriented",
+  "active lifestyle",
+  "curious",
+] as const;
+
+const dealbreakerOptions = [
+  "smoking",
+  "dishonesty",
+  "flakiness",
+  "heavy partying",
+  "poor communication",
+  "jealousy",
+  "rudeness",
+  "non-monogamy mismatch",
+] as const;
 
 const defaultForm: FormState = {
   name: "",
@@ -50,10 +75,13 @@ const defaultForm: FormState = {
   activityLevel: "active",
   drinking: "social",
   smoking: "never",
-  dealbreakers: "",
+  dealbreakers: [],
+  customDealbreakers: "",
   idealFirstDate: "",
   preferenceMinAge: "24",
   preferenceMaxAge: "38",
+  partnerPriorities: [],
+  preferredDynamic: "balanced",
   preferenceNotes: "",
   agentType: "hosted",
 };
@@ -65,9 +93,52 @@ function parseCsv(input: string): string[] {
     .filter(Boolean);
 }
 
+function toggleSelection(current: string[], value: string): string[] {
+  return current.includes(value)
+    ? current.filter((item) => item !== value)
+    : [...current, value];
+}
+
+function dedupeValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+
+  for (const value of values) {
+    const normalized = value.trim();
+    const key = normalized.toLowerCase();
+    if (!normalized || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(normalized);
+  }
+
+  return deduped;
+}
+
+function buildDealbreakerList(form: FormState): string[] {
+  return dedupeValues([...form.dealbreakers, ...parseCsv(form.customDealbreakers)]);
+}
+
+function buildPreferenceNotes(form: FormState): string {
+  const notes: string[] = [];
+
+  if (form.partnerPriorities.length) {
+    notes.push(`Partner priorities: ${form.partnerPriorities.join(", ")}.`);
+  }
+
+  notes.push(`Preferred dynamic: ${form.preferredDynamic}.`);
+
+  if (form.preferenceNotes.trim()) {
+    notes.push(form.preferenceNotes.trim());
+  }
+
+  return notes.join(" ");
+}
+
 const fieldClass =
   "field mt-2 text-sm";
 const labelClass = "grid gap-1 text-sm font-bold text-white/84";
+const chipClass =
+  "rounded-full border px-3 py-2 text-xs font-bold transition";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -105,10 +176,10 @@ export default function OnboardingPage() {
         drinking: form.drinking,
         smoking: form.smoking,
       },
-      dealbreakers: parseCsv(form.dealbreakers),
+      dealbreakers: buildDealbreakerList(form),
       idealFirstDate: form.idealFirstDate,
       preferenceAgeRange: { min: Number(form.preferenceMinAge) || 18, max: Number(form.preferenceMaxAge) || 60 },
-      preferenceNotes: form.preferenceNotes,
+      preferenceNotes: buildPreferenceNotes(form),
       agentType: form.agentType,
     };
   }
@@ -172,10 +243,10 @@ export default function OnboardingPage() {
         drinking: form.drinking,
         smoking: form.smoking,
       },
-      dealbreakers: parseCsv(form.dealbreakers),
+      dealbreakers: buildDealbreakerList(form),
       idealFirstDate: form.idealFirstDate,
       preferenceAgeRange: { min, max },
-      preferenceNotes: form.preferenceNotes,
+      preferenceNotes: buildPreferenceNotes(form),
       agentType: form.agentType,
     };
 
@@ -267,9 +338,36 @@ export default function OnboardingPage() {
                   </select>
                 </label>
               ))}
-              <label className={`${labelClass} sm:col-span-2`}>Dealbreakers (comma-separated)
-                <input className={fieldClass} value={form.dealbreakers} onChange={(e) => update("dealbreakers", e.target.value)} />
-              </label>
+              <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-4">
+                <legend className="px-2 text-sm font-bold text-white">Dealbreakers</legend>
+                <p className="px-2 text-xs leading-5 text-white/58">
+                  Pick the things your agent should treat as likely blockers. These feed directly into match quality checks.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {dealbreakerOptions.map((option) => {
+                    const selected = form.dealbreakers.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        className={`${chipClass} ${selected ? "border-emerald-300/70 bg-emerald-400/18 text-white" : "border-white/12 bg-white/[0.04] text-white/72"}`}
+                        onClick={() => update("dealbreakers", toggleSelection(form.dealbreakers, option))}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className={`${labelClass} mt-4`}>
+                  Add anything custom
+                  <input
+                    className={fieldClass}
+                    value={form.customDealbreakers}
+                    onChange={(e) => update("customDealbreakers", e.target.value)}
+                    placeholder="e.g. cruelty, inconsistent effort"
+                  />
+                </label>
+              </fieldset>
               <label className={`${labelClass} sm:col-span-2`}>Ideal first date
                 <input className={fieldClass} value={form.idealFirstDate} onChange={(e) => update("idealFirstDate", e.target.value)} />
               </label>
@@ -299,8 +397,57 @@ export default function OnboardingPage() {
               <label className={labelClass}>Preferred max age
                 <input className={fieldClass} inputMode="numeric" value={form.preferenceMaxAge} onChange={(e) => update("preferenceMaxAge", e.target.value)} />
               </label>
-              <label className={`${labelClass} sm:col-span-2`}>Preference notes
-                <textarea className={fieldClass} rows={2} value={form.preferenceNotes} onChange={(e) => update("preferenceNotes", e.target.value)} />
+              <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-4">
+                <legend className="px-2 text-sm font-bold text-white">Partner priorities</legend>
+                <p className="px-2 text-xs leading-5 text-white/58">
+                  Choose the qualities that matter most so your agent can explain what a strong fit looks like.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {partnerPriorityOptions.map((option) => {
+                    const selected = form.partnerPriorities.includes(option);
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        className={`${chipClass} ${selected ? "border-cyan-300/70 bg-cyan-400/18 text-white" : "border-white/12 bg-white/[0.04] text-white/72"}`}
+                        onClick={() => update("partnerPriorities", toggleSelection(form.partnerPriorities, option))}
+                      >
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-4">
+                <legend className="px-2 text-sm font-bold text-white">Preferred dynamic</legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {([
+                    ["slow-burn", "Slow burn"],
+                    ["balanced", "Balanced"],
+                    ["instant-spark", "Instant spark"],
+                  ] as const).map(([value, label]) => {
+                    const selected = form.preferredDynamic === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${selected ? "border-pink-300/70 bg-pink-400/18 text-white" : "border-white/12 bg-white/[0.04] text-white/72"}`}
+                        onClick={() => update("preferredDynamic", value)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              <label className={`${labelClass} sm:col-span-2`}>Anything else your agent should know?
+                <textarea
+                  className={fieldClass}
+                  rows={2}
+                  value={form.preferenceNotes}
+                  onChange={(e) => update("preferenceNotes", e.target.value)}
+                  placeholder="Examples: values a calm pace, wants someone close to family, prefers planning ahead"
+                />
               </label>
               <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-3">
                 <legend className="px-2 text-sm font-bold text-white">Agent type</legend>
