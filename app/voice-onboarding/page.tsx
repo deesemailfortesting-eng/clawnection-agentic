@@ -160,20 +160,13 @@ export default function VoiceOnboardingPage() {
     }
 
     const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
-    const apiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
 
     if (!assistantId) {
       console.error("VAPI_ASSISTANT_ID not found. Please set NEXT_PUBLIC_VAPI_ASSISTANT_ID in your environment variables.");
       return;
     }
 
-    if (!apiKey) {
-      console.error("VAPI_API_KEY not found. Please set NEXT_PUBLIC_VAPI_API_KEY in your environment variables.");
-      return;
-    }
-
     console.log("Starting voice onboarding with assistant:", assistantId);
-    console.log("Pre-call data:", preCallData);
 
     // Set up call timeout (30 minutes)
     const callTimeout = setTimeout(() => {
@@ -184,23 +177,9 @@ export default function VoiceOnboardingPage() {
     }, 30 * 60 * 1000); // 30 minutes in milliseconds
 
     try {
-      // Update the assistant's first message with pre-call data
       const customFirstMessage = `Hey ${preCallData.name} — Clawnection here. I can see from what you shared that you identify as ${preCallData.gender} and your sexual preference is ${preCallData.sexualPreference}. Before we get going, just so you know what this is: we're gonna talk for however long feels right. After this, I spin up a version of you that goes and chats with other people's agents — and when yours genuinely clicks with someone, we set up a real meet. So this is just… you and me, for a bit. No form, no right answers. Where are you right now — like, physically, what room are you in?`;
 
-      await fetch(`https://api.vapi.ai/assistant/${assistantId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          firstMessage: customFirstMessage
-        })
-      });
-
-      console.log("Updated assistant first message with pre-call data");
-
-      await vapiRef.current.start(assistantId);
+      await vapiRef.current.start(assistantId, { firstMessage: customFirstMessage });
       console.log("Vapi start successful");
       setShowPreCallForm(false);
     } catch (error) {
