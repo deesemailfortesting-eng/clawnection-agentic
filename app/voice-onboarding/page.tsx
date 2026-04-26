@@ -138,6 +138,7 @@ export default function VoiceOnboardingPage() {
   const vapiRef = useRef<Vapi | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<ProfileData>({});
+  const pendingProfileIdRef = useRef<string | null>(null);
 
   const [step, setStep] = useState<StepId>("welcome");
 
@@ -194,7 +195,7 @@ export default function VoiceOnboardingPage() {
             : undefined;
 
       const romanticProfile: RomanticProfile = {
-        id: `voice-${crypto.randomUUID()}`,
+        id: pendingProfileIdRef.current ?? `voice-${crypto.randomUUID()}`,
         name: resolvedFirstName,
         lastName: data.lastName || lastName || undefined,
         age: resolvedAge,
@@ -326,6 +327,34 @@ export default function VoiceOnboardingPage() {
     }, 30 * 60 * 1000);
 
     try {
+      // Pre-generate and persist the profileId so the webhook FK resolves when it arrives.
+      const profileId = `voice-${crypto.randomUUID()}`;
+      pendingProfileIdRef.current = profileId;
+      const stubProfile: RomanticProfile = {
+        id: profileId,
+        name: firstName,
+        lastName: lastName || undefined,
+        age: ageNumber,
+        phoneNumber: phone ? normalizePhone(phone) : undefined,
+        genderIdentity: gender,
+        lookingFor: preference,
+        location,
+        occupation: occupationType ? { type: occupationType, place: occupationPlace } : undefined,
+        relationshipIntent: (intent || "long-term") as RelationshipIntent,
+        bio: "",
+        interests: [],
+        values: [],
+        communicationStyle: "balanced",
+        lifestyleHabits: { sleepSchedule: "flexible", socialEnergy: "balanced", activityLevel: "active", drinking: "social", smoking: "never" },
+        dealbreakers: [],
+        idealFirstDate: "",
+        preferenceAgeRange: { min: 24, max: 38 },
+        preferenceNotes: "",
+        agentType: "hosted",
+      };
+      saveProfile(stubProfile);
+      syncProfileToServer(stubProfile);
+
       const occupationDetail =
         occupationType === "work"
           ? `they work${occupationPlace ? ` at ${occupationPlace}` : ""}`
@@ -334,7 +363,15 @@ export default function VoiceOnboardingPage() {
             : "";
       const intentLabel = intentOptions.find((o) => o.value === intent)?.label.toLowerCase() ?? "long-term";
       const firstMessage = `Hey ${firstName}. This is wtfradar. You said you're ${age}, based in ${location}${occupationDetail ? `, and ${occupationDetail}` : ""}. You identify as ${gender}, you're interested in ${preference}, and you're here for ${intentLabel}. We'll have a guided conversation to round out your dating profile. There are no right answers. To begin — what does an amazing first date look like for you?`;
-      await vapiRef.current.start(vapiAssistantId, { firstMessage });
+      await vapiRef.current.start(vapiAssistantId, {
+        firstMessage,
+        variableValues: {
+          profileId,
+          name: firstName,
+          gender,
+          sexual_preference: preference,
+        },
+      });
     } catch {
       if (callTimeoutRef.current) {
         clearTimeout(callTimeoutRef.current);

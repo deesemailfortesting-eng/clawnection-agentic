@@ -1,5 +1,7 @@
 # Copy this file to .dev.vars when you need local Cloudflare/Wrangler secrets.
 # Do not commit the real .dev.vars file.
 
-# Example:
-# SOME_SERVER_ONLY_SECRET=replace_me
+# Shared secret between the VAPI dashboard webhook config and this worker.
+# Set on the VAPI assistant → Server URL → Secret header value.
+# Deploy to production with: wrangler secret put VAPI_WEBHOOK_SECRET
+VAPI_WEBHOOK_SECRET=replace_me
