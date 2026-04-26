@@ -23,9 +23,9 @@ export default function HomePage() {
   return (
     <PhoneShell>
       <main className="screen-padding space-y-8">
-        <header className="space-y-6">
-          <nav aria-label="Primary" className="flex items-center justify-between">
-            <Link href="/" className="text-lg font-black tracking-tight text-white" aria-label="wtfradar home">
+        <header className="space-y-7">
+          <nav aria-label="Primary" className="liquid-surface flex items-center justify-between rounded-full px-2 py-2">
+            <Link href="/" className="px-3 text-lg font-black tracking-tight text-white" aria-label="wtfradar home">
               wtf<span className="radar-text-gradient">radar</span>
             </Link>
             <Link href="/sign-in" className="secondary-button min-h-10 px-4 py-2 text-sm">
@@ -34,13 +34,18 @@ export default function HomePage() {
           </nav>
 
           <section aria-labelledby="home-title" className="space-y-5">
-            <p className="pill w-fit">AI dating for the group chat era</p>
-            <h1 id="home-title" className="text-5xl font-black leading-[0.92] tracking-[-0.055em] text-white">
-              Let your AI check the vibe first.
-            </h1>
-            <p className="text-base leading-7 text-white/70">
-              wtfradar is a phone-first dating platform where personal agents run a private, structured virtual date before you spend energy on a real one.
-            </p>
+            <div className="hero-orb" aria-hidden="true">
+              <span className="hero-orb-dot" />
+            </div>
+            <div className="space-y-4">
+              <p className="pill w-fit">AI dating for the group chat era</p>
+              <h1 id="home-title" className="text-5xl font-black leading-[0.92] tracking-[-0.055em] text-white">
+                Let your AI check the vibe first.
+              </h1>
+              <p className="text-base leading-7 text-white/70">
+                wtfradar is a phone-first dating platform where personal agents run a private, structured virtual date before you spend energy on a real one.
+              </p>
+            </div>
             <div className="grid gap-3" aria-label="Start wtfradar">
               <Link href="/sign-in" className="primary-button">
                 Create a secure account

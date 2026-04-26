@@ -43,7 +43,7 @@ export default function SignInPage() {
             </div>
           </header>
 
-          <form className="obsidian-card space-y-5 rounded-[2rem] p-5" onSubmit={handleSubmit}>
+          <form className="obsidian-card liquid-glass space-y-5 rounded-[2rem] p-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-bold text-white/86">
                 Email address
@@ -111,7 +111,7 @@ export default function SignInPage() {
           </form>
         </section>
 
-        <section aria-labelledby="signin-privacy" className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+        <section aria-labelledby="signin-privacy" className="liquid-glass rounded-3xl p-4">
           <h2 id="signin-privacy" className="text-base font-extrabold">
             Privacy by default
           </h2>
