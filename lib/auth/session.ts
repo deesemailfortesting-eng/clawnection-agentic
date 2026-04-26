@@ -12,6 +12,10 @@ function getSecretKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+export function getSessionSecret(): string | null {
+  return process.env.AUTH_SESSION_SECRET?.trim() || null;
+}
+
 export async function signSessionToken(payload: SessionPayload, secret: string): Promise<string> {
   return new SignJWT({ email: payload.email ?? "" })
     .setProtectedHeader({ alg: "HS256" })

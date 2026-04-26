@@ -3,15 +3,12 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { verifyAppleIdentityToken } from "@/lib/auth/apple";
 import {
   buildSessionCookie,
+  getSessionSecret,
   sessionMaxAgeSeconds,
   signSessionToken,
 } from "@/lib/auth/session";
 
 export const runtime = "edge";
-
-function getSessionSecret(): string | null {
-  return process.env.AUTH_SESSION_SECRET?.trim() || null;
-}
 
 export async function POST(req: NextRequest) {
   const secret = getSessionSecret();

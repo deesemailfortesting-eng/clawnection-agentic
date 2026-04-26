@@ -3,15 +3,12 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { verifyPassword } from "@/lib/auth/password";
 import {
   buildSessionCookie,
+  getSessionSecret,
   sessionMaxAgeSeconds,
   signSessionToken,
 } from "@/lib/auth/session";
 
 export const runtime = "edge";
-
-function getSessionSecret(): string | null {
-  return process.env.AUTH_SESSION_SECRET?.trim() || null;
-}
 
 export async function POST(req: NextRequest) {
   const secret = getSessionSecret();

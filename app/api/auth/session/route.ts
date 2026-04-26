@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sessionCookieName, verifySessionToken } from "@/lib/auth/session";
+import { getSessionSecret, sessionCookieName, verifySessionToken } from "@/lib/auth/session";
 
 export const runtime = "edge";
-
-function getSessionSecret(): string | null {
-  return process.env.AUTH_SESSION_SECRET?.trim() || null;
-}
 
 function readCookie(req: NextRequest, name: string): string | null {
   const raw = req.cookies.get(name)?.value;
