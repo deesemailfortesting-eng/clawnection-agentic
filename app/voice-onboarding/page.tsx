@@ -291,7 +291,7 @@ export default function VoiceOnboardingPage() {
       saveProfile(romanticProfile);
       syncProfileToServer(romanticProfile);
       setIsComplete(true);
-      setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(romanticProfile.id)}`), 1800);
+      setTimeout(() => router.push(`/persona?profileId=${encodeURIComponent(romanticProfile.id)}`), 1800);
     },
     [
       ageNumber,
