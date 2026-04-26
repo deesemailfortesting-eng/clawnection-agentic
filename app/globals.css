@@ -236,6 +236,48 @@ select.field option {
   color: #ffffff;
 }
 
+/*
+ * Native date input — relies on the system date picker (the iOS wheel picker
+ * on iPhone, the OS calendar widget elsewhere). We just style the visible
+ * field to fit the dark theme and invert the calendar glyph so it shows up
+ * on the dark background.
+ */
+.date-field {
+  appearance: none;
+  -webkit-appearance: none;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.date-field::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.5em;
+}
+
+.date-field::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.2);
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.date-field::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.date-field::-webkit-datetime-edit {
+  color: #ffffff;
+}
+
+.date-field::-webkit-datetime-edit-fields-wrapper {
+  color: #ffffff;
+}
+
+.date-field:invalid::-webkit-datetime-edit,
+.date-field:placeholder-shown::-webkit-datetime-edit {
+  color: rgba(255, 255, 255, 0.42);
+}
+
 .primary-button {
   display: inline-flex;
   min-height: 48px;
@@ -314,121 +356,171 @@ select.field option {
   font-weight: 750;
 }
 
+/*
+ * The voice orb is the wtfradar logo, blown up: a big red disc with the radar's
+ * concentric rings, a rotating sweep, and pulsing rings emanating outward when
+ * the user is on a live call. It doubles as the "tap to talk" button.
+ */
 .voice-orb {
   position: relative;
   display: grid;
   place-items: center;
-  width: 220px;
-  height: 220px;
+  width: 240px;
+  height: 240px;
   margin: 0 auto;
+  border: none;
+  padding: 0;
   border-radius: 999px;
+  cursor: pointer;
   isolation: isolate;
+  background: transparent;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.voice-orb::before,
-.voice-orb::after {
-  content: "";
+.voice-orb-disc {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.55), transparent 55%),
-    radial-gradient(circle at 70% 70%, rgba(124, 58, 237, 0.55), transparent 60%),
-    linear-gradient(135deg, var(--radar-pink), var(--radar-orange));
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.42), transparent 55%),
+    radial-gradient(circle at 68% 78%, rgba(124, 58, 237, 0.45), transparent 60%),
+    radial-gradient(circle at 50% 50%, #ff4458 0%, #e02038 65%, #b3122a 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    0 30px 80px rgba(255, 68, 88, 0.35),
-    0 0 60px rgba(255, 122, 24, 0.45);
-  z-index: -1;
+    inset 0 2px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -8px 24px rgba(0, 0, 0, 0.35),
+    0 30px 80px rgba(255, 68, 88, 0.45),
+    0 0 60px rgba(255, 122, 24, 0.4);
+  animation: voiceOrbPulse 3.6s ease-in-out infinite;
 }
 
-.voice-orb::after {
-  filter: blur(28px) saturate(140%);
-  opacity: 0.85;
-  animation: voiceOrbBreathe 3.6s ease-in-out infinite;
+.voice-orb-radar {
+  position: absolute;
+  inset: 12%;
+  border-radius: inherit;
+  pointer-events: none;
 }
 
-.voice-orb-core {
-  width: 64%;
-  height: 64%;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.85), transparent 55%),
-    radial-gradient(circle at 70% 75%, rgba(255, 255, 255, 0.18), transparent 60%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04));
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  animation: voiceOrbCore 4.2s ease-in-out infinite;
+.voice-orb-radar svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
 }
 
-.voice-orb[data-active="true"]::after {
-  animation-duration: 1.6s;
-  filter: blur(20px) saturate(160%);
-  opacity: 1;
+.voice-orb-sweep {
+  transform-origin: 50% 50%;
+  transform-box: fill-box;
+  animation: voiceOrbSweep 4.2s linear infinite;
 }
 
-.voice-orb[data-active="true"] .voice-orb-core {
-  animation-duration: 1.4s;
+.voice-orb-dot {
+  transform-origin: 50% 50%;
+  transform-box: fill-box;
+  animation: voiceOrbDot 3.6s ease-in-out infinite;
 }
 
 .voice-orb-ring {
   position: absolute;
-  inset: -14px;
+  inset: -10px;
   border-radius: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1.5px solid rgba(255, 68, 88, 0.55);
   pointer-events: none;
-  animation: voiceOrbRing 2.8s ease-out infinite;
+  animation: voiceOrbRing 3s ease-out infinite;
+  opacity: 0;
 }
 
 .voice-orb-ring:nth-child(2) {
-  animation-delay: 0.9s;
+  animation-delay: 1s;
 }
 
 .voice-orb-ring:nth-child(3) {
-  animation-delay: 1.8s;
+  animation-delay: 2s;
+}
+
+.voice-orb:hover .voice-orb-disc {
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.36),
+    inset 0 -8px 24px rgba(0, 0, 0, 0.32),
+    0 36px 96px rgba(255, 68, 88, 0.55),
+    0 0 80px rgba(255, 122, 24, 0.5);
+}
+
+.voice-orb:active .voice-orb-disc {
+  transform: scale(0.97);
+}
+
+.voice-orb[data-active="true"] .voice-orb-disc {
+  animation-duration: 1.6s;
+}
+
+.voice-orb[data-active="true"] .voice-orb-sweep {
+  animation-duration: 1.8s;
 }
 
 .voice-orb[data-active="true"] .voice-orb-ring {
   animation-duration: 1.8s;
 }
 
-@keyframes voiceOrbBreathe {
+.voice-orb:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.voice-orb:disabled .voice-orb-disc,
+.voice-orb:disabled .voice-orb-sweep,
+.voice-orb:disabled .voice-orb-ring,
+.voice-orb:disabled .voice-orb-dot {
+  animation-play-state: paused;
+}
+
+@keyframes voiceOrbPulse {
   0%, 100% {
     transform: scale(1);
-    opacity: 0.85;
+    filter: brightness(1);
   }
   50% {
-    transform: scale(1.07);
-    opacity: 1;
+    transform: scale(1.04);
+    filter: brightness(1.06);
   }
 }
 
-@keyframes voiceOrbCore {
+@keyframes voiceOrbSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes voiceOrbDot {
   0%, 100% {
     transform: scale(1);
+    opacity: 1;
   }
   50% {
-    transform: scale(1.06);
+    transform: scale(1.25);
+    opacity: 0.85;
   }
 }
 
 @keyframes voiceOrbRing {
   0% {
-    transform: scale(0.8);
-    opacity: 0.6;
+    transform: scale(0.85);
+    opacity: 0.7;
   }
   100% {
-    transform: scale(1.4);
+    transform: scale(1.55);
     opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .voice-orb::after,
-  .voice-orb-core,
-  .voice-orb-ring {
+  .voice-orb-disc,
+  .voice-orb-sweep,
+  .voice-orb-ring,
+  .voice-orb-dot {
     animation: none !important;
   }
 }

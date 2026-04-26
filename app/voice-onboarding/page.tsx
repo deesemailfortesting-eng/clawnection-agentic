@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
 import { PhoneShell } from "@/components/PhoneShell";
+import { VoiceOrb } from "@/components/VoiceOrb";
 import { saveProfile, syncProfileToServer } from "@/lib/storage";
 import {
   CommunicationStyle,
@@ -44,9 +45,8 @@ type ProfileData = {
 
 type StepId =
   | "welcome"
-  | "firstName"
-  | "lastName"
-  | "age"
+  | "name"
+  | "dob"
   | "phone"
   | "location"
   | "occupationType"
@@ -59,9 +59,8 @@ type StepId =
 
 const STEP_ORDER: StepId[] = [
   "welcome",
-  "firstName",
-  "lastName",
-  "age",
+  "name",
+  "dob",
   "phone",
   "location",
   "occupationType",
@@ -72,6 +71,56 @@ const STEP_ORDER: StepId[] = [
   "socials",
   "voice",
 ];
+
+/*
+ * Capitalize each name token. Splits on spaces, hyphens, and apostrophes so
+ * "mary jane" → "Mary Jane", "o'brien" → "O'Brien", "jean-luc" → "Jean-Luc".
+ * Preserves all delimiters and lowercases everything after the first letter
+ * of each token. Safe to call from onChange (idempotent).
+ */
+function capitalizeName(input: string): string {
+  return input.replace(/([^\s'-]+)/g, (token) =>
+    token.charAt(0).toUpperCase() + token.slice(1).toLowerCase(),
+  );
+}
+
+/*
+ * Computes age from an ISO 'YYYY-MM-DD' date string (the value emitted by
+ * <input type="date">). Returns 0 for invalid input. Accounts for whether
+ * this year's birthday has already happened.
+ */
+function computeAgeFromIsoDate(iso: string): number {
+  if (!iso) return 0;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return 0;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!year || !month || !day) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const beforeBirthdayThisYear =
+    today.getMonth() + 1 < month ||
+    (today.getMonth() + 1 === month && today.getDate() < day);
+  if (beforeBirthdayThisYear) age -= 1;
+  return age;
+}
+
+/*
+ * Renders a YYYY-MM-DD date string into a friendly format like 'June 12, 2002'
+ * for the inline confirmation under the picker.
+ */
+function formatDobDisplay(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!match) return "";
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 const genderOptions = [
   { value: "woman", label: "Woman" },
@@ -143,7 +192,7 @@ export default function VoiceOnboardingPage() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [age, setAge] = useState("");
+  const [dob, setDob] = useState("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
   const [occupationType, setOccupationType] = useState<"work" | "school" | "">("");
@@ -172,10 +221,21 @@ export default function VoiceOnboardingPage() {
     document.title = "Onboarding · wtfradar";
   }, []);
 
-  const ageNumber = Number(age);
-  const ageIsValid = !Number.isNaN(ageNumber) && ageNumber >= 18 && ageNumber <= 120;
+  const ageNumber = computeAgeFromIsoDate(dob);
+  const dobIsComplete = Boolean(dob);
+  const ageIsValid = ageNumber >= 18 && ageNumber <= 120;
   const phoneDigitsOnly = phone.replace(/\D/g, "");
   const phoneIsValid = phoneDigitsOnly.length >= 7 && phoneDigitsOnly.length <= 15;
+  const dobMaxIso = useMemo(() => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 18);
+    return today.toISOString().slice(0, 10);
+  }, []);
+  const dobMinIso = useMemo(() => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 100);
+    return today.toISOString().slice(0, 10);
+  }, []);
 
   const processAndSaveProfile = useCallback(
     (data: ProfileData) => {
@@ -333,7 +393,7 @@ export default function VoiceOnboardingPage() {
             ? `they study${occupationPlace ? ` at ${occupationPlace}` : ""}`
             : "";
       const intentLabel = intentOptions.find((o) => o.value === intent)?.label.toLowerCase() ?? "long-term";
-      const firstMessage = `Hey ${firstName}. This is wtfradar. You said you're ${age}, based in ${location}${occupationDetail ? `, and ${occupationDetail}` : ""}. You identify as ${gender}, you're interested in ${preference}, and you're here for ${intentLabel}. We'll have a guided conversation to round out your dating profile. There are no right answers. To begin — what does an amazing first date look like for you?`;
+      const firstMessage = `Hey ${firstName}. This is wtfradar. You said you're ${ageNumber}, based in ${location}${occupationDetail ? `, and ${occupationDetail}` : ""}. You identify as ${gender}, you're interested in ${preference}, and you're here for ${intentLabel}. We'll have a guided conversation to round out your dating profile. There are no right answers. To begin — what does an amazing first date look like for you?`;
       await vapiRef.current.start(vapiAssistantId, { firstMessage });
     } catch {
       if (callTimeoutRef.current) {
@@ -349,9 +409,8 @@ export default function VoiceOnboardingPage() {
   }
 
   const continueDisabled =
-    (step === "firstName" && !firstName.trim()) ||
-    (step === "lastName" && !lastName.trim()) ||
-    (step === "age" && !ageIsValid) ||
+    (step === "name" && (!firstName.trim() || !lastName.trim())) ||
+    (step === "dob" && !ageIsValid) ||
     (step === "phone" && !phoneIsValid) ||
     (step === "location" && !location.trim()) ||
     (step === "occupationType" && !occupationType) ||
@@ -423,64 +482,71 @@ export default function VoiceOnboardingPage() {
           </section>
         )}
 
-        {step === "firstName" && (
+        {step === "name" && (
           <StepLayout
             pill="A bit about you"
-            title="What's your first name?"
-            onContinue={goNext}
-            continueDisabled={continueDisabled}
-          >
-            <input
-              className="field text-lg"
-              value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
-              placeholder="First name"
-              autoFocus
-              autoComplete="given-name"
-              aria-label="First name"
-            />
-          </StepLayout>
-        )}
-
-        {step === "lastName" && (
-          <StepLayout
-            pill="A bit about you"
-            title={`Nice, ${firstName.trim() || "friend"}. And your last name?`}
+            title="What's your name?"
             description="Last names stay private until you and a match both agree to share."
             onContinue={goNext}
             continueDisabled={continueDisabled}
           >
-            <input
-              className="field text-lg"
-              value={lastName}
-              onChange={(event) => setLastName(event.target.value)}
-              placeholder="Last name"
-              autoFocus
-              autoComplete="family-name"
-              aria-label="Last name"
-            />
+            <label className="grid gap-1 text-sm font-bold text-white/84">
+              <span className="text-xs uppercase tracking-[0.18em] text-white/52">First name</span>
+              <input
+                className="field text-lg"
+                value={firstName}
+                onChange={(event) => setFirstName(capitalizeName(event.target.value))}
+                placeholder="First name"
+                autoFocus
+                autoComplete="given-name"
+                autoCapitalize="words"
+                spellCheck={false}
+                aria-label="First name"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-bold text-white/84">
+              <span className="text-xs uppercase tracking-[0.18em] text-white/52">Last name</span>
+              <input
+                className="field text-lg"
+                value={lastName}
+                onChange={(event) => setLastName(capitalizeName(event.target.value))}
+                placeholder="Last name"
+                autoComplete="family-name"
+                autoCapitalize="words"
+                spellCheck={false}
+                aria-label="Last name"
+              />
+            </label>
           </StepLayout>
         )}
 
-        {step === "age" && (
+        {step === "dob" && (
           <StepLayout
             pill="A bit about you"
-            title="How old are you?"
-            description="You must be 18 or older to use wtfradar."
+            title="When's your birthday?"
+            description="You must be 18 or older to use wtfradar. We only show your age, not your full birthday."
             onContinue={goNext}
             continueDisabled={continueDisabled}
-            error={age && !ageIsValid ? "You must be 18 or older to continue." : undefined}
+            error={dobIsComplete && !ageIsValid ? "You must be 18 or older to continue." : undefined}
           >
-            <input
-              className="field text-lg"
-              value={age}
-              onChange={(event) => setAge(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
-              placeholder="Age"
-              inputMode="numeric"
-              autoFocus
-              autoComplete="off"
-              aria-label="Age"
-            />
+            <label className="grid gap-1 text-sm font-bold text-white/84">
+              <span className="text-xs uppercase tracking-[0.18em] text-white/52">Date of birth</span>
+              <input
+                type="date"
+                className="field date-field text-lg"
+                value={dob}
+                onChange={(event) => setDob(event.target.value)}
+                min={dobMinIso}
+                max={dobMaxIso}
+                autoFocus
+                aria-label="Date of birth"
+              />
+            </label>
+            {ageIsValid ? (
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/52">
+                {formatDobDisplay(dob)} · you&apos;ll be shown as {ageNumber}
+              </p>
+            ) : null}
           </StepLayout>
         )}
 
@@ -711,22 +777,12 @@ export default function VoiceOnboardingPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={isCallActive ? endVoiceCall : startVoiceCall}
+            <VoiceOrb
+              active={isCallActive}
               disabled={isComplete}
-              className="voice-orb"
-              data-active={isCallActive}
-              aria-label={isCallActive ? "End voice call" : "Start voice call"}
-            >
-              <span className="voice-orb-ring" aria-hidden="true" />
-              <span className="voice-orb-ring" aria-hidden="true" />
-              <span className="voice-orb-ring" aria-hidden="true" />
-              <span className="voice-orb-core" aria-hidden="true" />
-              <span className="sr-only">
-                {isCallActive ? "Voice call active. Tap to end." : "Tap to start voice call."}
-              </span>
-            </button>
+              onClick={isCallActive ? endVoiceCall : startVoiceCall}
+              ariaLabel={isCallActive ? "End voice call" : "Start voice call"}
+            />
 
             <div className="w-full space-y-3">
               <p
