@@ -10,7 +10,7 @@ type FormState = {
   name: string;
   age: string;
   genderIdentity: string;
-  lookingFor: string;
+  lookingFor: "Men" | "Women" | "Everyone";
   location: string;
   relationshipIntent: RelationshipIntent;
   bio: string;
@@ -34,7 +34,7 @@ const defaultForm: FormState = {
   name: "",
   age: "",
   genderIdentity: "",
-  lookingFor: "",
+  lookingFor: "Everyone",
   location: "",
   relationshipIntent: "long-term",
   bio: "",
@@ -146,7 +146,13 @@ export default function OnboardingPage() {
               <label className="text-sm text-zinc-700">Name *<input className={fieldClass} value={form.name} onChange={(e) => update("name", e.target.value)} /></label>
               <label className="text-sm text-zinc-700">Age *<input className={fieldClass} value={form.age} onChange={(e) => update("age", e.target.value)} /></label>
               <label className="text-sm text-zinc-700">Gender identity<input className={fieldClass} value={form.genderIdentity} onChange={(e) => update("genderIdentity", e.target.value)} /></label>
-              <label className="text-sm text-zinc-700">Looking for<input className={fieldClass} value={form.lookingFor} onChange={(e) => update("lookingFor", e.target.value)} /></label>
+              <label className="text-sm text-zinc-700">Looking for
+                <select className={fieldClass} value={form.lookingFor} onChange={(e) => update("lookingFor", e.target.value as FormState["lookingFor"])}>
+                  <option value="Men">Men</option>
+                  <option value="Women">Women</option>
+                  <option value="Everyone">Everyone</option>
+                </select>
+              </label>
               <label className="text-sm text-zinc-700 sm:col-span-2">Location *<input className={fieldClass} value={form.location} onChange={(e) => update("location", e.target.value)} /></label>
             </div>
           </OnboardingSection>
