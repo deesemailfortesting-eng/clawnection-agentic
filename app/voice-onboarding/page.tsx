@@ -36,6 +36,12 @@ export default function VoiceOnboardingPage() {
   const [isCallActive, setIsCallActive] = useState(false);
   const [profile, setProfile] = useState<ProfileData>({});
   const [isComplete, setIsComplete] = useState(false);
+  const [preCallData, setPreCallData] = useState({
+    name: "",
+    gender: "",
+    sexualPreference: ""
+  });
+  const [showPreCallForm, setShowPreCallForm] = useState(true);
 
   useEffect(() => {
     // Initialize Vapi
@@ -54,11 +60,7 @@ export default function VoiceOnboardingPage() {
       (window as any).Vapi.apiKey = apiKey;
     }
 
-    vapiRef.current = new Vapi({
-      onError: (error) => {
-        console.error("Vapi initialization error:", error);
-      }
-    });
+    vapiRef.current = new Vapi(apiKey);
 
     console.log("Vapi initialized successfully:", !!vapiRef.current);
 
@@ -151,6 +153,12 @@ export default function VoiceOnboardingPage() {
       return;
     }
 
+    // Validate pre-call data
+    if (!preCallData.name || !preCallData.gender || !preCallData.sexualPreference) {
+      alert("Please fill in all fields before starting the call.");
+      return;
+    }
+
     const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
     const apiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
 
@@ -165,12 +173,39 @@ export default function VoiceOnboardingPage() {
     }
 
     console.log("Starting voice onboarding with assistant:", assistantId);
+    console.log("Pre-call data:", preCallData);
+
+    // Set up call timeout (30 minutes)
+    const callTimeout = setTimeout(() => {
+      if (vapiRef.current) {
+        console.log("Call timeout reached (30 minutes), ending call");
+        vapiRef.current.stop();
+      }
+    }, 30 * 60 * 1000); // 30 minutes in milliseconds
 
     try {
+      // Update the assistant's first message with pre-call data
+      const customFirstMessage = `Hey ${preCallData.name} — Clawnection here. I can see from what you shared that you identify as ${preCallData.gender} and your sexual preference is ${preCallData.sexualPreference}. Before we get going, just so you know what this is: we're gonna talk for however long feels right. After this, I spin up a version of you that goes and chats with other people's agents — and when yours genuinely clicks with someone, we set up a real meet. So this is just… you and me, for a bit. No form, no right answers. Where are you right now — like, physically, what room are you in?`;
+
+      await fetch(`https://api.vapi.ai/assistant/${assistantId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstMessage: customFirstMessage
+        })
+      });
+
+      console.log("Updated assistant first message with pre-call data");
+
       await vapiRef.current.start(assistantId);
       console.log("Vapi start successful");
+      setShowPreCallForm(false);
     } catch (error) {
       console.error("Failed to start voice onboarding:", error);
+      clearTimeout(callTimeout);
     }
   };
 
@@ -192,7 +227,75 @@ export default function VoiceOnboardingPage() {
         </header>
 
         <div className="rounded-xl border border-zinc-200 bg-white p-6">
-          {!isCallActive && !isComplete && (
+          {showPreCallForm ? (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-zinc-900 mb-2">Before we start chatting...</h2>
+                <p className="text-sm text-zinc-600">Let's get to know you a bit first. This helps our AI assistant have a more personalized conversation.</p>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="text-sm font-medium text-zinc-700">What's your name?</span>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    value={preCallData.name}
+                    onChange={(e) => setPreCallData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter your name"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-zinc-700">What's your gender?</span>
+                  <select
+                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    value={preCallData.gender}
+                    onChange={(e) => setPreCallData(prev => ({ ...prev, gender: e.target.value }))}
+                  >
+                    <option value="">Select your gender</option>
+                    <option value="woman">Woman</option>
+                    <option value="man">Man</option>
+                    <option value="non-binary">Non-binary</option>
+                    <option value="other">Other</option>
+                    <option value="prefer-not-to-say">Prefer not to say</option>
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-medium text-zinc-700">What's your sexual preference?</span>
+                  <select
+                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    value={preCallData.sexualPreference}
+                    onChange={(e) => setPreCallData(prev => ({ ...prev, sexualPreference: e.target.value }))}
+                  >
+                    <option value="">Select your preference</option>
+                    <option value="straight">Straight</option>
+                    <option value="gay">Gay</option>
+                    <option value="lesbian">Lesbian</option>
+                    <option value="bisexual">Bisexual</option>
+                    <option value="pansexual">Pansexual</option>
+                    <option value="asexual">Asexual</option>
+                    <option value="queer">Queer</option>
+                    <option value="other">Other</option>
+                    <option value="prefer-not-to-say">Prefer not to say</option>
+                  </select>
+                </label>
+              </div>
+
+              <button
+                onClick={startVoiceOnboarding}
+                disabled={!preCallData.name || !preCallData.gender || !preCallData.sexualPreference}
+                className="w-full rounded-xl bg-rose-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:bg-zinc-300 disabled:cursor-not-allowed"
+              >
+                Start 30-Minute Voice Chat
+              </button>
+
+              <p className="text-xs text-zinc-500 text-center">
+                This call will automatically end after 30 minutes. You can end it early at any time.
+              </p>
+            </div>
+          ) : !isCallActive && !isComplete ? (
             <div className="text-center space-y-4">
               <p className="text-sm text-zinc-600">
                 Ready to get started? Click the button below to begin your voice onboarding session.
@@ -204,7 +307,7 @@ export default function VoiceOnboardingPage() {
                 Start Voice Onboarding
               </button>
             </div>
-          )}
+          ) : null}
 
           {isCallActive && (
             <div className="text-center space-y-4">
