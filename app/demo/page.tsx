@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ProfileCard } from "@/components/ProfileCard";
 import { sampleProfiles } from "@/lib/data/sampleProfiles";
 import { runVirtualDateSimulation } from "@/lib/matching/virtualDate";
-import { loadProfile, saveResult } from "@/lib/storage";
+import { loadProfile, saveResult, syncResultToServer } from "@/lib/storage";
 import { RomanticProfile } from "@/lib/types/matching";
 
 export default function DemoPage() {
@@ -31,6 +31,7 @@ export default function DemoPage() {
     if (!profile) return;
     const result = runVirtualDateSimulation(profile, counterpart);
     saveResult(result);
+    syncResultToServer(result);
     router.push("/results");
   }
 

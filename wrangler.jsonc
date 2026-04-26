@@ -21,5 +21,12 @@
   },
   "observability": {
     "enabled": true
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "clawnection-db",
+      "database_id": "5bddf833-3d10-43d2-a18c-e443d04e79af"
+    }
+  ]
 }

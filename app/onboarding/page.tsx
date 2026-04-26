@@ -3,7 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { OnboardingSection } from "@/components/OnboardingSection";
-import { saveProfile, saveSignals, saveGap } from "@/lib/storage";
+import { saveProfile, saveSignals, saveGap, syncProfileToServer, syncSignalsToServer, syncGapToServer } from "@/lib/storage";
 import { CommunicationStyle, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
 import { SelfAwarenessGap, WhatsAppSignals } from "@/lib/types/behavioral";
 import { WhatsAppUpload } from "@/components/WhatsAppUpload";
@@ -115,6 +115,10 @@ export default function OnboardingPage() {
     update("sleepSchedule", updatedProfile.lifestyleHabits.sleepSchedule);
     saveSignals(signals);
     saveGap(gap);
+    // Sync to D1 — profileId may not be final yet, use a temp key derived from current name
+    const tempId = `local-${updatedProfile.name.toLowerCase().replace(/\s+/g, "-")}`;
+    syncSignalsToServer(tempId, signals, signals.userMessageCount);
+    syncGapToServer(tempId, gap);
     setWhatsAppApplied(true);
   }
 
@@ -168,6 +172,7 @@ export default function OnboardingPage() {
     };
 
     saveProfile(profile);
+    syncProfileToServer(profile);
     router.push("/demo");
   }
 

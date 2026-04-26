@@ -34,18 +34,12 @@ This prototype still keeps application state simple, even though deployment infr
 - No OpenClaw integration yet
 - No external matchmaking dependencies
 
-Current app state is still local-only using:
-
-- local files
-- TypeScript modules
-- `localStorage`
+State is persisted via **Cloudflare D1** (edge SQLite) in the deployed version, with `localStorage` as a fast local cache and graceful fallback when offline. The API routes live under `app/api/` and use the `@opennextjs/cloudflare` adapter to access D1 bindings.
 
 Deployment support now includes:
 
 - Cloudflare Workers via OpenNext
 - Wrangler-based preview and deploy scripts
-
-Database-backed persistence is not wired into the app yet. The checked-in config does not currently include a D1 binding, and the runtime storage path is still `localStorage`.
 
 ## Run locally
 
@@ -56,7 +50,18 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-## Preview or deploy on Cloudflare
+## Cloudflare deployment
+
+A live deployment exists on Cloudflare Workers, **separate from the GitHub repository**. The deployed version may be ahead of or behind what is in git — they are not automatically synced.
+
+**Live URL:** [clawnection.deesemailfortesting.workers.dev](https://clawnection.deesemailfortesting.workers.dev)
+**Account:** <deesemailfortesting@gmail.com>
+**Worker name:** clawnection
+**Database:** Cloudflare D1 · `clawnection-db`
+
+The deployed worker includes a D1-backed API layer (`/api/profiles`, `/api/signals`, `/api/gaps`, `/api/matches`) that is **not present in the original localStorage-only codebase**. Profile data, WhatsApp signals, and match results are persisted server-side on Cloudflare's edge.
+
+To redeploy manually:
 
 ```bash
 npm run preview
