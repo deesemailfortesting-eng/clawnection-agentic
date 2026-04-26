@@ -204,4 +204,4 @@ Candidates for strict handling include:
 
 ## Relationship to the current prototype
 
-The current repo remains a deterministic, local-only MVP. This document does not change the implementation constraints in [PROJECT_SPEC.md](PROJECT_SPEC.md). It defines the target architecture so future work can evolve toward a layered system without mixing extraction, scoring, and negotiation concerns.
+The current repo remains a deterministic, local-only MVP. This document does not change the implementation constraints in [PROJECT_SPEC.md](../specs/PROJECT_SPEC.md). It defines the target architecture so future work can evolve toward a layered system without mixing extraction, scoring, and negotiation concerns.

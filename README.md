@@ -82,6 +82,8 @@ npm run deploy
 - Add persistence, user accounts, and match history.
 - Add OpenClaw support and richer multi-agent orchestration.
 
-For a condensed roadmap, see `PROJECT_SPEC.md`.
+For a condensed roadmap, see `docs/specs/PROJECT_SPEC.md`.
 
-For the current layered system direction, see `ARCHITECTURE.md`.
+For the current layered system direction, see `docs/architecture/ARCHITECTURE.md`.
+
+For the rest of the planning and design docs, see `docs/README.md`.
