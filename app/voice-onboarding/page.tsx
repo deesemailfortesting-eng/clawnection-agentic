@@ -92,6 +92,18 @@ function daysInMonth(month: number, year: number): number {
   return new Date(year, month, 0).getDate();
 }
 
+/*
+ * Capitalize each name token. Splits on spaces, hyphens, and apostrophes so
+ * "mary jane" → "Mary Jane", "o'brien" → "O'Brien", "jean-luc" → "Jean-Luc".
+ * Preserves all delimiters and lowercases everything after the first letter
+ * of each token. Safe to call from onChange (idempotent).
+ */
+function capitalizeName(input: string): string {
+  return input.replace(/([^\s'-]+)/g, (token) =>
+    token.charAt(0).toUpperCase() + token.slice(1).toLowerCase(),
+  );
+}
+
 function computeAgeFromDob(year: number, month: number, day: number): number {
   if (!year || !month || !day) return 0;
   const today = new Date();
@@ -483,10 +495,12 @@ export default function VoiceOnboardingPage() {
               <input
                 className="field text-lg"
                 value={firstName}
-                onChange={(event) => setFirstName(event.target.value)}
+                onChange={(event) => setFirstName(capitalizeName(event.target.value))}
                 placeholder="First name"
                 autoFocus
                 autoComplete="given-name"
+                autoCapitalize="words"
+                spellCheck={false}
                 aria-label="First name"
               />
             </label>
@@ -495,9 +509,11 @@ export default function VoiceOnboardingPage() {
               <input
                 className="field text-lg"
                 value={lastName}
-                onChange={(event) => setLastName(event.target.value)}
+                onChange={(event) => setLastName(capitalizeName(event.target.value))}
                 placeholder="Last name"
                 autoComplete="family-name"
+                autoCapitalize="words"
+                spellCheck={false}
                 aria-label="Last name"
               />
             </label>
