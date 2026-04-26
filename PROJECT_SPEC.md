@@ -40,3 +40,10 @@ Then a closing assessment synthesizes:
 - Real external agent handshake protocol
 - Persistent profiles and match history
 - Live experiments on scoring and recommendation calibration
+
+## Architecture direction
+- Keep signal extraction, compatibility modeling, and agent negotiation as separate layers.
+- Start with a chat-first ingestion MVP before broadening data sources.
+- Treat consent and sensitive-inference boundaries as first-class design constraints.
+
+See `ARCHITECTURE.md` for the working system design notes.

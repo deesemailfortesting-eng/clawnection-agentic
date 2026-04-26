@@ -4,6 +4,7 @@ import {
   VirtualDateRound,
   VirtualDateRoundType,
 } from "@/lib/types/matching";
+import { WhatsAppSignals } from "@/lib/types/behavioral";
 
 const roundLanguage: Record<VirtualDateRoundType, string> = {
   introductions: "established tone and baseline attraction factors",
@@ -16,6 +17,11 @@ const roundLanguage: Record<VirtualDateRoundType, string> = {
 
 export class HostedAgentAdapter implements AgentAdapter {
   readonly type = "hosted" as const;
+  private signals: WhatsAppSignals | null;
+
+  constructor(signals?: WhatsAppSignals | null) {
+    this.signals = signals ?? null;
+  }
 
   getAgentSummary(profile: RomanticProfile): string {
     return `Hosted Clawnection agent for ${profile.name}: calibrated for ${profile.relationshipIntent} matchmaking, prioritizing ${profile.values.slice(0, 2).join(" and ")}.`;
@@ -36,6 +42,24 @@ export class HostedAgentAdapter implements AgentAdapter {
           ? "mixed"
           : "caution";
 
+    // For the communication round, enrich summary with behavioral signal data if available
+    if (roundType === "communication" && this.signals && !this.signals.isLowConfidence) {
+      const depthNote =
+        this.signals.longMessageRatio > 0.4
+          ? "tends toward substantive message depth"
+          : "typically communicates in concise bursts";
+      const initiationNote =
+        this.signals.initiationRatio > 0.55
+          ? "historically initiates contact more often than average"
+          : this.signals.initiationRatio < 0.35
+            ? "tends to respond rather than initiate conversations"
+            : "shows balanced contact initiation patterns";
+      return {
+        summary: `Hosted agent ${roundLanguage[roundType]}: behavioral data shows ${self.name} ${depthNote} and ${initiationNote}.`,
+        signal,
+      };
+    }
+
     return {
       summary: `Hosted agent ${roundLanguage[roundType]} and noted ${sharedInterests.length > 0 ? `shared interests in ${sharedInterests.slice(0, 2).join(" and ")}` : "few direct overlaps, requiring stronger intentional coordination"}.`,
       signal,
@@ -47,6 +71,12 @@ export class HostedAgentAdapter implements AgentAdapter {
     counterpart: RomanticProfile,
     input: ClosingAssessmentInput,
   ): string {
-    return `Hosted synthesis: ${self.name} and ${counterpart.name} scored ${input.score}/100 with strongest indicators around ${input.strengths.slice(0, 2).join("; ") || "baseline alignment"}. Key watchpoint: ${input.concerns[0]?.title ?? "none severe"}.`;
+    const attachmentNote = this.signals
+      ? this.signals.responseLatencyStdDevMs > this.signals.avgResponseLatencyMs * 1.5
+        ? " Behavioral note: response pacing inconsistency may be worth discussing openly early on."
+        : " Behavioral note: consistent response rhythm is a positive attachment signal."
+      : "";
+
+    return `Hosted synthesis: ${self.name} and ${counterpart.name} scored ${input.score}/100 with strongest indicators around ${input.strengths.slice(0, 2).join("; ") || "baseline alignment"}. Key watchpoint: ${input.concerns[0]?.title ?? "none severe"}.${attachmentNote}`;
   }
 }
