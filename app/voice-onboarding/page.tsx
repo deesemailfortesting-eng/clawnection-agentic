@@ -1,19 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
 import { PhoneShell } from "@/components/PhoneShell";
 import { saveProfile, syncProfileToServer } from "@/lib/storage";
-import { CommunicationStyle, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
+import {
+  CommunicationStyle,
+  Occupation,
+  RelationshipIntent,
+  RomanticProfile,
+} from "@/lib/types/matching";
 
 type ProfileData = {
   name?: string;
+  lastName?: string;
   age?: number;
+  phoneNumber?: string;
   genderIdentity?: string;
   lookingFor?: string;
   location?: string;
+  occupation?: Occupation;
+  instagram?: string;
+  linkedin?: string;
   relationshipIntent?: RelationshipIntent;
   bio?: string;
   interests?: string[];
@@ -32,8 +42,73 @@ type ProfileData = {
   agentType?: RomanticProfile["agentType"];
 };
 
-const fieldClass = "field mt-2 text-sm";
-const labelClass = "grid gap-1 text-sm font-bold text-white/84";
+type StepId =
+  | "welcome"
+  | "firstName"
+  | "lastName"
+  | "age"
+  | "phone"
+  | "location"
+  | "occupationType"
+  | "occupationPlace"
+  | "gender"
+  | "preference"
+  | "intent"
+  | "socials"
+  | "voice";
+
+const STEP_ORDER: StepId[] = [
+  "welcome",
+  "firstName",
+  "lastName",
+  "age",
+  "phone",
+  "location",
+  "occupationType",
+  "occupationPlace",
+  "gender",
+  "preference",
+  "intent",
+  "socials",
+  "voice",
+];
+
+const genderOptions = [
+  { value: "woman", label: "Woman" },
+  { value: "man", label: "Man" },
+  { value: "non-binary", label: "Non-binary" },
+  { value: "other", label: "Something else" },
+  { value: "prefer-not-to-say", label: "Prefer not to say" },
+] as const;
+
+const preferenceOptions = [
+  { value: "straight", label: "Straight" },
+  { value: "gay", label: "Gay" },
+  { value: "lesbian", label: "Lesbian" },
+  { value: "bisexual", label: "Bisexual" },
+  { value: "pansexual", label: "Pansexual" },
+  { value: "queer", label: "Queer" },
+  { value: "asexual", label: "Asexual" },
+  { value: "prefer-not-to-say", label: "Prefer not to say" },
+] as const;
+
+const intentOptions: ReadonlyArray<{
+  value: RelationshipIntent;
+  label: string;
+  blurb: string;
+}> = [
+  { value: "long-term", label: "Long-term", blurb: "Looking for something serious." },
+  { value: "serious-dating", label: "Serious dating", blurb: "Open to a real relationship." },
+  { value: "exploring", label: "Exploring", blurb: "Seeing what feels right." },
+  { value: "casual", label: "Casual / hookups", blurb: "Short-term, no pressure." },
+  { value: "friendship-first", label: "Friends first", blurb: "Connection over romance." },
+];
+
+const occupationTypeOptions = [
+  { value: "work" as const, label: "I work", blurb: "Tell us where" },
+  { value: "school" as const, label: "I'm in school", blurb: "Where do you study?" },
+];
+
 const vapiApiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
 const vapiAssistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
 
@@ -43,71 +118,137 @@ function messageText(message: unknown): string {
   return typeof text === "string" ? text : "";
 }
 
+// Light, format-friendly phone normalization. We don't validate carrier-correctness.
+function normalizePhone(input: string): string {
+  return input.replace(/[^\d+]/g, "");
+}
+
+function formatPhoneDisplay(input: string): string {
+  // Allows the user to see digit grouping while typing US-shaped numbers; non-US users keep raw +/digits.
+  const digits = input.replace(/\D/g, "");
+  if (input.trim().startsWith("+")) return "+" + digits;
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return `+${digits.slice(0, digits.length - 10)} (${digits.slice(-10, -7)}) ${digits.slice(-7, -4)}-${digits.slice(-4)}`;
+}
+
 export default function VoiceOnboardingPage() {
   const router = useRouter();
   const vapiRef = useRef<Vapi | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileRef = useRef<ProfileData>({});
+
+  const [step, setStep] = useState<StepId>("welcome");
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [age, setAge] = useState("");
+  const [phone, setPhone] = useState("");
+  const [location, setLocation] = useState("");
+  const [occupationType, setOccupationType] = useState<"work" | "school" | "">("");
+  const [occupationPlace, setOccupationPlace] = useState("");
+  const [gender, setGender] = useState("");
+  const [preference, setPreference] = useState("");
+  const [intent, setIntent] = useState<RelationshipIntent | "">("");
+  const [instagram, setInstagram] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+
   const [isCallActive, setIsCallActive] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({});
+  const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [profile, setProfile] = useState<ProfileData>({});
   const [error, setError] = useState<string | null>(() =>
     vapiApiKey ? null : "Voice onboarding is not configured. NEXT_PUBLIC_VAPI_API_KEY is missing.",
   );
-  const [preCallData, setPreCallData] = useState({
-    name: "",
-    gender: "",
-    sexualPreference: "",
-  });
-  const [showPreCallForm, setShowPreCallForm] = useState(true);
 
-  // Stable ref so processAndSaveProfile always sees latest profile state
-  const profileRef = useRef<ProfileData>({});
+  const stepIndex = useMemo(() => STEP_ORDER.indexOf(step), [step]);
 
   useEffect(() => {
     profileRef.current = profile;
   }, [profile]);
 
-  const processAndSaveProfile = useCallback((data: ProfileData) => {
-    if (!data.name || !data.age || !data.location || !data.bio) return;
+  useEffect(() => {
+    document.title = "Onboarding · wtfradar";
+  }, []);
 
-    const romanticProfile: RomanticProfile = {
-      id: `voice-${crypto.randomUUID()}`,
-      name: data.name,
-      age: data.age,
-      genderIdentity: data.genderIdentity || "",
-      lookingFor: data.lookingFor || "",
-      location: data.location,
-      relationshipIntent: data.relationshipIntent || "long-term",
-      bio: data.bio,
-      interests: data.interests || [],
-      values: data.values || [],
-      communicationStyle: data.communicationStyle || "balanced",
-      lifestyleHabits: {
-        sleepSchedule: data.sleepSchedule || "flexible",
-        socialEnergy: data.socialEnergy || "balanced",
-        activityLevel: data.activityLevel || "active",
-        drinking: data.drinking || "social",
-        smoking: data.smoking || "never",
-      },
-      dealbreakers: data.dealbreakers || [],
-      idealFirstDate: data.idealFirstDate || "",
-      preferenceAgeRange: {
-        min: data.preferenceMinAge || 24,
-        max: data.preferenceMaxAge || 38,
-      },
-      preferenceNotes: data.preferenceNotes || "",
-      agentType: data.agentType || "hosted",
-    };
+  const ageNumber = Number(age);
+  const ageIsValid = !Number.isNaN(ageNumber) && ageNumber >= 18 && ageNumber <= 120;
+  const phoneDigitsOnly = phone.replace(/\D/g, "");
+  const phoneIsValid = phoneDigitsOnly.length >= 7 && phoneDigitsOnly.length <= 15;
 
-    saveProfile(romanticProfile);
-    // Persist to Cloudflare D1 in the background
-    syncProfileToServer(romanticProfile);
-    setIsComplete(true);
-    setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(romanticProfile.id)}`), 2000);
-  }, [router]);
+  const processAndSaveProfile = useCallback(
+    (data: ProfileData) => {
+      const resolvedFirstName = data.name || firstName;
+      const resolvedAge = data.age || ageNumber || 0;
+      const resolvedLocation = data.location || location;
+      const resolvedBio = data.bio || "";
+
+      if (!resolvedFirstName || !resolvedAge || !resolvedLocation || !resolvedBio) return;
+
+      const occupation: Occupation | undefined =
+        data.occupation
+          ? data.occupation
+          : occupationType
+            ? { type: occupationType, place: occupationPlace }
+            : undefined;
+
+      const romanticProfile: RomanticProfile = {
+        id: `voice-${crypto.randomUUID()}`,
+        name: resolvedFirstName,
+        lastName: data.lastName || lastName || undefined,
+        age: resolvedAge,
+        phoneNumber: data.phoneNumber || (phone ? normalizePhone(phone) : undefined),
+        genderIdentity: data.genderIdentity || gender,
+        lookingFor: data.lookingFor || "",
+        location: resolvedLocation,
+        occupation,
+        instagram: data.instagram || instagram || undefined,
+        linkedin: data.linkedin || linkedin || undefined,
+        relationshipIntent: (data.relationshipIntent || intent || "long-term") as RelationshipIntent,
+        bio: resolvedBio,
+        interests: data.interests || [],
+        values: data.values || [],
+        communicationStyle: data.communicationStyle || "balanced",
+        lifestyleHabits: {
+          sleepSchedule: data.sleepSchedule || "flexible",
+          socialEnergy: data.socialEnergy || "balanced",
+          activityLevel: data.activityLevel || "active",
+          drinking: data.drinking || "social",
+          smoking: data.smoking || "never",
+        },
+        dealbreakers: data.dealbreakers || [],
+        idealFirstDate: data.idealFirstDate || "",
+        preferenceAgeRange: {
+          min: data.preferenceMinAge || 24,
+          max: data.preferenceMaxAge || 38,
+        },
+        preferenceNotes: data.preferenceNotes || "",
+        agentType: data.agentType || "hosted",
+      };
+
+      saveProfile(romanticProfile);
+      syncProfileToServer(romanticProfile);
+      setIsComplete(true);
+      setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(romanticProfile.id)}`), 1800);
+    },
+    [
+      ageNumber,
+      firstName,
+      gender,
+      instagram,
+      intent,
+      lastName,
+      linkedin,
+      location,
+      occupationPlace,
+      occupationType,
+      phone,
+      router,
+    ],
+  );
 
   useEffect(() => {
-    document.title = "Voice onboarding · wtfradar";
     if (!vapiApiKey) return;
 
     vapiRef.current = new Vapi(vapiApiKey);
@@ -117,12 +258,16 @@ export default function VoiceOnboardingPage() {
 
     vapi.on("call-end", () => {
       setIsCallActive(false);
+      setIsAssistantSpeaking(false);
       if (callTimeoutRef.current) {
         clearTimeout(callTimeoutRef.current);
         callTimeoutRef.current = null;
       }
       processAndSaveProfile(profileRef.current);
     });
+
+    vapi.on("speech-start", () => setIsAssistantSpeaking(true));
+    vapi.on("speech-end", () => setIsAssistantSpeaking(false));
 
     vapi.on("message", (message: unknown) => {
       const text = messageText(message);
@@ -141,7 +286,8 @@ export default function VoiceOnboardingPage() {
     vapi.on("error", (err: unknown) => {
       console.error("Vapi error:", err);
       setIsCallActive(false);
-      setError("The voice call stopped unexpectedly. You can try again or use text onboarding.");
+      setIsAssistantSpeaking(false);
+      setError("The voice call stopped unexpectedly. Tap the orb to try again.");
     });
 
     return () => {
@@ -150,49 +296,102 @@ export default function VoiceOnboardingPage() {
     };
   }, [processAndSaveProfile]);
 
-  async function startVoiceOnboarding() {
+  function goNext() {
+    setError(null);
+
+    // Branch: skip the "where" follow-up if the user picks "neither/skip" later — for now we always ask.
+    const next = STEP_ORDER[stepIndex + 1];
+    if (next) setStep(next);
+  }
+
+  function goBack() {
+    setError(null);
+    const prev = STEP_ORDER[stepIndex - 1];
+    if (prev) setStep(prev);
+  }
+
+  async function startVoiceCall() {
     if (!vapiRef.current) {
       setError("Voice onboarding is not initialized. Check NEXT_PUBLIC_VAPI_API_KEY.");
       return;
     }
-    if (!preCallData.name || !preCallData.gender || !preCallData.sexualPreference) {
-      setError("Please fill in all fields before starting the call.");
-      return;
-    }
-
     if (!vapiAssistantId) {
       setError("Voice onboarding is not configured. NEXT_PUBLIC_VAPI_ASSISTANT_ID is missing.");
       return;
     }
 
     setError(null);
-
-    // Auto-terminate after 30 minutes so microphone access cannot remain open indefinitely.
-    callTimeoutRef.current = setTimeout(() => { vapiRef.current?.stop(); }, 30 * 60 * 1000);
+    callTimeoutRef.current = setTimeout(() => {
+      vapiRef.current?.stop();
+    }, 30 * 60 * 1000);
 
     try {
-      const firstMessage = `Hey ${preCallData.name}. This is wtfradar. You shared that you identify as ${preCallData.gender} and your dating preference is ${preCallData.sexualPreference}. We will have a guided conversation to build your dating profile. After this, your agent can chat with other agents in a virtual date before you decide whether to meet someone. There are no right answers. To begin, where are you right now, like what room are you in?`;
+      const occupationDetail =
+        occupationType === "work"
+          ? `they work${occupationPlace ? ` at ${occupationPlace}` : ""}`
+          : occupationType === "school"
+            ? `they study${occupationPlace ? ` at ${occupationPlace}` : ""}`
+            : "";
+      const intentLabel = intentOptions.find((o) => o.value === intent)?.label.toLowerCase() ?? "long-term";
+      const firstMessage = `Hey ${firstName}. This is wtfradar. You said you're ${age}, based in ${location}${occupationDetail ? `, and ${occupationDetail}` : ""}. You identify as ${gender}, you're interested in ${preference}, and you're here for ${intentLabel}. We'll have a guided conversation to round out your dating profile. There are no right answers. To begin — what does an amazing first date look like for you?`;
       await vapiRef.current.start(vapiAssistantId, { firstMessage });
-      setShowPreCallForm(false);
     } catch {
       if (callTimeoutRef.current) {
         clearTimeout(callTimeoutRef.current);
         callTimeoutRef.current = null;
       }
-      setError("Failed to start the call. Check your Vapi credentials.");
+      setError("Failed to start the call. Please try again.");
     }
   }
 
+  function endVoiceCall() {
+    vapiRef.current?.stop();
+  }
+
+  const continueDisabled =
+    (step === "firstName" && !firstName.trim()) ||
+    (step === "lastName" && !lastName.trim()) ||
+    (step === "age" && !ageIsValid) ||
+    (step === "phone" && !phoneIsValid) ||
+    (step === "location" && !location.trim()) ||
+    (step === "occupationType" && !occupationType) ||
+    (step === "occupationPlace" && !occupationPlace.trim()) ||
+    (step === "gender" && !gender) ||
+    (step === "preference" && !preference) ||
+    (step === "intent" && !intent);
+
   return (
     <PhoneShell>
-      <main className="screen-padding space-y-6">
+      <main className="screen-padding flex min-h-dvh flex-col gap-8">
         <header className="space-y-4">
-          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
-          <p className="pill w-fit">Voice onboarding</p>
-          <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">Build your profile by voice</h1>
-          <p className="text-sm leading-6 text-white/66">
-            Talk with the wtfradar assistant to create your dating profile. Every spoken instruction is also summarized on this screen.
-          </p>
+          <div className="flex items-center justify-between">
+            {stepIndex > 0 && step !== "voice" && !isCallActive ? (
+              <button
+                type="button"
+                onClick={goBack}
+                className="text-sm font-bold text-white/68 hover:text-white"
+                aria-label="Go back to the previous step"
+              >
+                ← Back
+              </button>
+            ) : (
+              <Link href="/" className="text-sm font-bold text-white/58" aria-label="wtfradar home">
+                wtfradar
+              </Link>
+            )}
+            <span className="pill">
+              Step {stepIndex + 1} of {STEP_ORDER.length}
+            </span>
+          </div>
+
+          <div className="step-progress" aria-hidden="true">
+            {STEP_ORDER.map((id, idx) => (
+              <span
+                key={id}
+                data-state={idx < stepIndex ? "done" : idx === stepIndex ? "active" : "upcoming"}
+              />
+            ))}
+          </div>
         </header>
 
         {error && (
@@ -201,141 +400,415 @@ export default function VoiceOnboardingPage() {
           </div>
         )}
 
-        <section aria-labelledby="voice-status-title" className="obsidian-card rounded-[30px] p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 id="voice-status-title" className="text-xl font-black text-white">Microphone status</h2>
-              <p className="mt-1 text-sm leading-6 text-white/62">
-                {isCallActive ? "Your microphone is active for the onboarding call." : "Your microphone is off."}
-              </p>
-            </div>
-            <div
-              aria-hidden="true"
-              className={`mt-1 h-5 w-5 rounded-full ${isCallActive ? "animate-pulse bg-emerald-400 shadow-[0_0_26px_rgba(52,211,153,0.8)]" : "bg-white/18"}`}
-            />
-          </div>
-          <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-white">
-            {isCallActive ? "Microphone active. The assistant can hear you now." : "Microphone inactive. Start the call when you are ready."}
-          </p>
-        </section>
-
-        <section aria-labelledby="voice-flow-title" className="obsidian-card rounded-[30px] p-5">
-          {showPreCallForm && !isCallActive && !isComplete && (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <h2 id="voice-flow-title" className="text-xl font-black text-white">Before the call</h2>
-                <p className="text-sm leading-6 text-white/64">
-                  These details help the assistant start respectfully. You can end the call at any time.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <label className={labelClass}>
-                  What is your name?
-                  <input
-                    type="text"
-                    className={fieldClass}
-                    value={preCallData.name}
-                    onChange={(e) => setPreCallData((p) => ({ ...p, name: e.target.value }))}
-                    placeholder="Enter your name"
-                    required
-                  />
-                </label>
-
-                <label className={labelClass}>
-                  What is your gender?
-                  <select
-                    className={fieldClass}
-                    value={preCallData.gender}
-                    onChange={(e) => setPreCallData((p) => ({ ...p, gender: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select your gender</option>
-                    <option value="woman">Woman</option>
-                    <option value="man">Man</option>
-                    <option value="non-binary">Non-binary</option>
-                    <option value="other">Other</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
-                </label>
-
-                <label className={labelClass}>
-                  What is your dating preference?
-                  <select
-                    className={fieldClass}
-                    value={preCallData.sexualPreference}
-                    onChange={(e) => setPreCallData((p) => ({ ...p, sexualPreference: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select your preference</option>
-                    <option value="straight">Straight</option>
-                    <option value="gay">Gay</option>
-                    <option value="lesbian">Lesbian</option>
-                    <option value="bisexual">Bisexual</option>
-                    <option value="pansexual">Pansexual</option>
-                    <option value="asexual">Asexual</option>
-                    <option value="queer">Queer</option>
-                    <option value="other">Other</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
-                </label>
-              </div>
-
-              <button
-                type="button"
-                onClick={startVoiceOnboarding}
-                disabled={!preCallData.name || !preCallData.gender || !preCallData.sexualPreference}
-                className="primary-button w-full"
-              >
-                Start voice onboarding
-              </button>
-
-              <p className="text-center text-xs leading-5 text-white/50">
-                Automatically ends after 30 minutes. You can end early at any time.
-              </p>
-            </div>
-          )}
-
-          {isCallActive && (
+        {step === "welcome" && (
+          <section className="flex flex-1 flex-col justify-between gap-8">
             <div className="space-y-5">
-              <div className="space-y-2">
-                <h2 id="voice-flow-title" className="text-xl font-black text-white">Call in progress</h2>
-                <p className="text-sm leading-6 text-white/66">
-                  Speak naturally. The assistant will ask about your location, values, interests, communication style, boundaries, and first-date preferences.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                <h3 className="text-sm font-black text-white">Visual equivalent of the audio prompt</h3>
-                <p className="mt-2 text-sm leading-6 text-white/62">
-                  The assistant is guiding you through profile questions. If you miss a spoken prompt, ask it to repeat or summarize the question.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => vapiRef.current?.stop()}
-                className="secondary-button w-full"
-                aria-label="End voice onboarding call and turn off the microphone"
-              >
-                End call and turn off microphone
+              <p className="pill w-fit">Welcome</p>
+              <h1 className="text-5xl font-black leading-[0.95] tracking-[-0.05em] text-white">
+                Let&apos;s build your<br />wtf<span className="radar-text-gradient">radar</span> profile.
+              </h1>
+              <p className="text-base leading-7 text-white/70">
+                A few quick taps, then a short voice chat with your AI assistant. No long forms — your agent learns you naturally.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button type="button" onClick={goNext} className="primary-button w-full">
+                Get started
               </button>
+              <p className="text-center text-xs text-white/52">
+                Takes about a minute. End the voice call anytime.
+              </p>
             </div>
-          )}
+          </section>
+        )}
 
-          {isComplete && (
-            <div className="space-y-3 text-center">
-              <h2 id="voice-flow-title" className="text-xl font-black text-white">Profile saved</h2>
-              <p className="text-sm leading-6 text-white/66">Your profile is ready. Redirecting to the virtual date demo.</p>
+        {step === "firstName" && (
+          <StepLayout
+            pill="A bit about you"
+            title="What's your first name?"
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <input
+              className="field text-lg"
+              value={firstName}
+              onChange={(event) => setFirstName(event.target.value)}
+              placeholder="First name"
+              autoFocus
+              autoComplete="given-name"
+              aria-label="First name"
+            />
+          </StepLayout>
+        )}
+
+        {step === "lastName" && (
+          <StepLayout
+            pill="A bit about you"
+            title={`Nice, ${firstName.trim() || "friend"}. And your last name?`}
+            description="Last names stay private until you and a match both agree to share."
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <input
+              className="field text-lg"
+              value={lastName}
+              onChange={(event) => setLastName(event.target.value)}
+              placeholder="Last name"
+              autoFocus
+              autoComplete="family-name"
+              aria-label="Last name"
+            />
+          </StepLayout>
+        )}
+
+        {step === "age" && (
+          <StepLayout
+            pill="A bit about you"
+            title="How old are you?"
+            description="You must be 18 or older to use wtfradar."
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+            error={age && !ageIsValid ? "You must be 18 or older to continue." : undefined}
+          >
+            <input
+              className="field text-lg"
+              value={age}
+              onChange={(event) => setAge(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
+              placeholder="Age"
+              inputMode="numeric"
+              autoFocus
+              autoComplete="off"
+              aria-label="Age"
+            />
+          </StepLayout>
+        )}
+
+        {step === "phone" && (
+          <StepLayout
+            pill="Account"
+            title="What's your phone number?"
+            description="We use it for verification and account recovery — never shared with matches."
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <input
+              className="field text-lg"
+              value={phone}
+              onChange={(event) => setPhone(formatPhoneDisplay(event.target.value))}
+              placeholder="(555) 555-1234"
+              type="tel"
+              inputMode="tel"
+              autoFocus
+              autoComplete="tel"
+              aria-label="Phone number"
+            />
+          </StepLayout>
+        )}
+
+        {step === "location" && (
+          <StepLayout
+            pill="Where you are"
+            title="Where do you live?"
+            description="City and state, or city and country. We use it to find nearby matches."
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <input
+              className="field text-lg"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="e.g. Cambridge, MA"
+              autoFocus
+              autoComplete="address-level2"
+              aria-label="Location"
+            />
+          </StepLayout>
+        )}
+
+        {step === "occupationType" && (
+          <StepLayout
+            pill="What you're up to"
+            title="What's your day job?"
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <div className="grid gap-3">
+              {occupationTypeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="option-tile"
+                  data-selected={occupationType === option.value}
+                  onClick={() => setOccupationType(option.value)}
+                >
+                  <span>
+                    <span className="block text-base font-bold text-white">{option.label}</span>
+                    <span className="block text-xs text-white/56">{option.blurb}</span>
+                  </span>
+                </button>
+              ))}
             </div>
-          )}
-        </section>
+          </StepLayout>
+        )}
 
-        <p className="text-center text-xs text-white/52">
-          Prefer to fill out the form manually?{" "}
-          <Link href="/onboarding" className="font-bold text-white underline underline-offset-4">
-            Open text onboarding
-          </Link>
-        </p>
+        {step === "occupationPlace" && (
+          <StepLayout
+            pill="What you're up to"
+            title={
+              occupationType === "school" ? "Where do you study?" : "Where do you work?"
+            }
+            description={
+              occupationType === "school"
+                ? "School or university name."
+                : "Company or what you do — your call."
+            }
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <input
+              className="field text-lg"
+              value={occupationPlace}
+              onChange={(event) => setOccupationPlace(event.target.value)}
+              placeholder={occupationType === "school" ? "e.g. MIT" : "e.g. Anthropic"}
+              autoFocus
+              autoComplete="organization"
+              aria-label={occupationType === "school" ? "School name" : "Work place"}
+            />
+          </StepLayout>
+        )}
+
+        {step === "gender" && (
+          <StepLayout
+            pill="About you"
+            title="I am a..."
+            description="Pick the option that fits best — you can be more specific in the voice chat."
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <div className="grid gap-3">
+              {genderOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="option-tile"
+                  data-selected={gender === option.value}
+                  onClick={() => setGender(option.value)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </StepLayout>
+        )}
+
+        {step === "preference" && (
+          <StepLayout
+            pill="Who you're looking for"
+            title="I'm attracted to..."
+            description="This helps your agent line up the right virtual dates."
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <div className="grid gap-3">
+              {preferenceOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="option-tile"
+                  data-selected={preference === option.value}
+                  onClick={() => setPreference(option.value)}
+                >
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </StepLayout>
+        )}
+
+        {step === "intent" && (
+          <StepLayout
+            pill="What you want"
+            title="What kind of relationship?"
+            description="Be honest — your agent will only match you with people who want similar things."
+            onContinue={goNext}
+            continueDisabled={continueDisabled}
+          >
+            <div className="grid gap-3">
+              {intentOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="option-tile"
+                  data-selected={intent === option.value}
+                  onClick={() => setIntent(option.value)}
+                >
+                  <span>
+                    <span className="block text-base font-bold text-white">{option.label}</span>
+                    <span className="block text-xs text-white/56">{option.blurb}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </StepLayout>
+        )}
+
+        {step === "socials" && (
+          <StepLayout
+            pill="Optional"
+            title="Add your socials?"
+            description="Totally optional — you can add or remove these any time. Only shared after you both opt in."
+            onContinue={goNext}
+            continueDisabled={false}
+            continueLabel={instagram || linkedin ? "Continue" : "Skip for now"}
+          >
+            <div className="grid gap-3">
+              <label className="grid gap-1 text-sm font-bold text-white/84">
+                <span className="text-xs uppercase tracking-[0.18em] text-white/52">Instagram</span>
+                <input
+                  className="field"
+                  value={instagram}
+                  onChange={(event) => setInstagram(event.target.value.replace(/^@/, ""))}
+                  placeholder="@yourhandle"
+                  autoComplete="off"
+                  aria-label="Instagram handle"
+                />
+              </label>
+              <label className="grid gap-1 text-sm font-bold text-white/84">
+                <span className="text-xs uppercase tracking-[0.18em] text-white/52">LinkedIn</span>
+                <input
+                  className="field"
+                  value={linkedin}
+                  onChange={(event) => setLinkedin(event.target.value)}
+                  placeholder="linkedin.com/in/you"
+                  autoComplete="off"
+                  aria-label="LinkedIn URL or handle"
+                />
+              </label>
+            </div>
+          </StepLayout>
+        )}
+
+        {step === "voice" && (
+          <section className="flex flex-1 flex-col items-center justify-between gap-10 text-center">
+            <div className="space-y-3">
+              <p className="pill mx-auto w-fit">
+                {isComplete ? "All set" : isCallActive ? "Listening" : "Voice chat"}
+              </p>
+              <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">
+                {isComplete
+                  ? "Profile saved."
+                  : isCallActive
+                    ? "Just speak naturally."
+                    : `Ready, ${firstName || "friend"}?`}
+              </h1>
+              <p className="mx-auto max-w-[28ch] text-sm leading-6 text-white/66">
+                {isComplete
+                  ? "Heading to your virtual date demo…"
+                  : isCallActive
+                    ? "Your agent is listening. Tell it about your life, what you want, and what you avoid."
+                    : "Tap the orb to start a short voice intro. End anytime."}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={isCallActive ? endVoiceCall : startVoiceCall}
+              disabled={isComplete}
+              className="voice-orb"
+              data-active={isCallActive}
+              aria-label={isCallActive ? "End voice call" : "Start voice call"}
+            >
+              <span className="voice-orb-ring" aria-hidden="true" />
+              <span className="voice-orb-ring" aria-hidden="true" />
+              <span className="voice-orb-ring" aria-hidden="true" />
+              <span className="voice-orb-core" aria-hidden="true" />
+              <span className="sr-only">
+                {isCallActive ? "Voice call active. Tap to end." : "Tap to start voice call."}
+              </span>
+            </button>
+
+            <div className="w-full space-y-3">
+              <p
+                role="status"
+                aria-live="polite"
+                className="text-xs font-bold uppercase tracking-[0.18em] text-white/52"
+              >
+                {isCallActive
+                  ? isAssistantSpeaking
+                    ? "Assistant speaking"
+                    : "Microphone live"
+                  : isComplete
+                    ? "Saved"
+                    : "Tap orb to begin"}
+              </p>
+              {isCallActive && (
+                <button
+                  type="button"
+                  onClick={endVoiceCall}
+                  className="secondary-button w-full"
+                >
+                  End call
+                </button>
+              )}
+              {!isCallActive && !isComplete && (
+                <p className="text-center text-xs text-white/48">
+                  Auto-ends after 30 minutes. Prefer typing?{" "}
+                  <Link href="/onboarding" className="font-bold text-white underline underline-offset-4">
+                    Use the form
+                  </Link>
+                  .
+                </p>
+              )}
+            </div>
+          </section>
+        )}
       </main>
     </PhoneShell>
+  );
+}
+
+function StepLayout({
+  pill,
+  title,
+  description,
+  children,
+  onContinue,
+  continueDisabled,
+  continueLabel = "Continue",
+  error,
+}: {
+  pill: string;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  onContinue: () => void;
+  continueDisabled: boolean;
+  continueLabel?: string;
+  error?: string;
+}) {
+  return (
+    <section className="flex flex-1 flex-col justify-between gap-8">
+      <div className="space-y-5">
+        <p className="pill w-fit">{pill}</p>
+        <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">{title}</h1>
+        {description ? <p className="text-sm leading-6 text-white/62">{description}</p> : null}
+        <div className="space-y-3">{children}</div>
+        {error ? (
+          <p role="alert" className="rounded-2xl border border-red-300/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">
+            {error}
+          </p>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={onContinue}
+        disabled={continueDisabled}
+        className="primary-button w-full"
+      >
+        {continueLabel}
+      </button>
+    </section>
   );
 }

@@ -354,6 +354,7 @@ export default function OnboardingPage() {
                   <option value="long-term">Long-term</option>
                   <option value="serious-dating">Serious dating</option>
                   <option value="exploring">Exploring</option>
+                  <option value="casual">Casual / hookups</option>
                   <option value="friendship-first">Friendship first</option>
                 </select>
               </label>
