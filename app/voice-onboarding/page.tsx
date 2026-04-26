@@ -45,28 +45,46 @@ export default function VoiceOnboardingPage() {
       return;
     }
 
-    vapiRef.current = new Vapi(apiKey);
+    console.log("Initializing Vapi with API key:", apiKey.substring(0, 10) + "...");
+
+    console.log("Initializing Vapi with API key:", apiKey.substring(0, 10) + "...");
+
+    // Try setting API key globally if the SDK supports it
+    if (typeof window !== 'undefined' && (window as any).Vapi) {
+      (window as any).Vapi.apiKey = apiKey;
+    }
+
+    vapiRef.current = new Vapi({
+      onError: (error) => {
+        console.error("Vapi initialization error:", error);
+      }
+    });
+
+    console.log("Vapi initialized successfully:", !!vapiRef.current);
 
     // Set up event listeners
     const vapi = vapiRef.current;
 
     vapi.on("call-start", () => {
+      console.log("Call started");
       setIsCallActive(true);
     });
 
     vapi.on("call-end", () => {
+      console.log("Call ended");
       setIsCallActive(false);
       // Process the collected data and save profile
       processAndSaveProfile();
     });
 
     vapi.on("message", (message: any) => {
+      console.log("Received message:", message);
       // Handle messages to extract profile data
       extractProfileData(message);
     });
 
     vapi.on("error", (error: any) => {
-      console.error("Vapi error:", error);
+      console.error("Vapi error details:", JSON.stringify(error, null, 2));
       setIsCallActive(false);
     });
 
@@ -128,56 +146,29 @@ export default function VoiceOnboardingPage() {
   };
 
   const startVoiceOnboarding = async () => {
-    if (!vapiRef.current) return;
+    if (!vapiRef.current) {
+      console.error("Vapi not initialized");
+      return;
+    }
 
-    const assistant = {
-      name: "Clawnection Onboarding Assistant",
-      model: {
-        provider: "openai" as const,
-        model: "gpt-4" as const,
-        temperature: 0.7,
-      },
-      voice: {
-        provider: "11labs" as const,
-        voiceId: process.env.NEXT_PUBLIC_VAPI_VOICE_ID || "default-voice-id",
-      },
-      systemMessage: `You are a friendly onboarding assistant for Clawnection, an agentic matchmaking app.
+    const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
+    const apiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
 
-Your task is to help users create their romantic profile by asking questions conversationally.
+    if (!assistantId) {
+      console.error("VAPI_ASSISTANT_ID not found. Please set NEXT_PUBLIC_VAPI_ASSISTANT_ID in your environment variables.");
+      return;
+    }
 
-Ask for the following information in a natural order:
-1. Name
-2. Age
-3. Gender identity
-4. What they're looking for
-5. Location
-6. Relationship intent (long-term, serious dating, exploring, friendship first)
-7. Short bio
-8. Interests (comma-separated)
-9. Values (comma-separated)
-10. Communication style (balanced, direct, warm, playful, reflective)
-11. Lifestyle: sleep schedule (early-bird, flexible, night-owl)
-12. Social energy (low-key, balanced, high-energy)
-13. Activity level (relaxed, active, very-active)
-14. Drinking habits (never, social, regular)
-15. Smoking habits (never, occasionally, regular)
-16. Dealbreakers (comma-separated)
-17. Ideal first date
-18. Preferred age range (min and max)
-19. Any additional preference notes
-20. Agent type preference (hosted or external)
+    if (!apiKey) {
+      console.error("VAPI_API_KEY not found. Please set NEXT_PUBLIC_VAPI_API_KEY in your environment variables.");
+      return;
+    }
 
-Be conversational and friendly. Confirm information and ask for clarification if needed.
-Once all information is collected, summarize and ask if they want to proceed.
-
-IMPORTANT: After collecting all information, output a JSON summary of the profile data in this exact format:
-PROFILE_DATA: {"name": "...", "age": 25, ...}
-
-Make sure to include all collected fields in the JSON.`,
-    };
+    console.log("Starting voice onboarding with assistant:", assistantId);
 
     try {
-      await vapiRef.current.start(assistant);
+      await vapiRef.current.start(assistantId);
+      console.log("Vapi start successful");
     } catch (error) {
       console.error("Failed to start voice onboarding:", error);
     }
