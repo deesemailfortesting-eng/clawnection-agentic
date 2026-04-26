@@ -1,0 +1,5 @@
+# Copy this file to .dev.vars when you need local Cloudflare/Wrangler secrets.
+# Do not commit the real .dev.vars file.
+
+# Example:
+# SOME_SERVER_ONLY_SECRET=replace_me
