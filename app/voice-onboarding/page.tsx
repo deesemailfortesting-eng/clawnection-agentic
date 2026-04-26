@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
 import { PhoneShell } from "@/components/PhoneShell";
+import { PhotoPicker } from "@/components/PhotoPicker";
 import { VoiceOrb } from "@/components/VoiceOrb";
 import { saveProfile, syncProfileToServer } from "@/lib/storage";
 import {
@@ -54,6 +55,7 @@ type StepId =
   | "gender"
   | "preference"
   | "intent"
+  | "photo"
   | "socials"
   | "voice";
 
@@ -68,9 +70,82 @@ const STEP_ORDER: StepId[] = [
   "gender",
   "preference",
   "intent",
+  "photo",
   "socials",
   "voice",
 ];
+
+/*
+ * Group the steps into three user-centric phases. The progress bar shows
+ * exactly three segments so users feel like they're checking off accomplishments
+ * rather than counting "step 7 of 12".
+ */
+type PhaseId = "basics" | "vibe" | "voice";
+
+type Phase = {
+  id: PhaseId;
+  label: string;
+  inProgressLabel: string;
+  doneLabel: string;
+  steps: StepId[];
+};
+
+const PHASES: Phase[] = [
+  {
+    id: "basics",
+    label: "The basics",
+    inProgressLabel: "Let's get to know you",
+    doneLabel: "Basics ✓",
+    steps: ["welcome", "name", "dob", "phone", "location", "occupationType", "occupationPlace"],
+  },
+  {
+    id: "vibe",
+    label: "Your vibe",
+    inProgressLabel: "Tell us your vibe",
+    doneLabel: "Vibe ✓",
+    steps: ["gender", "preference", "intent", "photo", "socials"],
+  },
+  {
+    id: "voice",
+    label: "Meet your AI",
+    inProgressLabel: "Meet your AI",
+    doneLabel: "All done ✓",
+    steps: ["voice"],
+  },
+];
+
+function getPhaseFor(step: StepId): Phase {
+  return PHASES.find((p) => p.steps.includes(step)) ?? PHASES[0];
+}
+
+/*
+ * Returns each phase's state for the progress bar. A phase is `done` when the
+ * user has moved past its last step, `active` when their current step is
+ * inside it (with a 0..1 fill ratio for the active segment), and `upcoming`
+ * otherwise.
+ */
+function getPhaseProgress(currentStep: StepId): Array<{
+  phase: Phase;
+  state: "done" | "active" | "upcoming";
+  fillRatio: number;
+}> {
+  const currentPhaseId = getPhaseFor(currentStep).id;
+  let seenActive = false;
+  return PHASES.map((phase) => {
+    if (phase.id === currentPhaseId) {
+      seenActive = true;
+      const idxInPhase = phase.steps.indexOf(currentStep);
+      // Make even the very first step show some fill so the user feels they've
+      // already taken a step forward by landing on this phase.
+      const denom = Math.max(phase.steps.length - 1, 1);
+      const ratio = phase.steps.length === 1 ? 1 : Math.max(0.18, idxInPhase / denom);
+      return { phase, state: "active" as const, fillRatio: ratio };
+    }
+    return seenActive
+      ? { phase, state: "upcoming" as const, fillRatio: 0 }
+      : { phase, state: "done" as const, fillRatio: 1 };
+  });
+}
 
 /*
  * Capitalize each name token. Splits on spaces, hyphens, and apostrophes so
@@ -187,12 +262,29 @@ export default function VoiceOnboardingPage() {
   const vapiRef = useRef<Vapi | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<ProfileData>({});
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Stable id created once per onboarding session so every partial sync to
+  // /api/profiles upserts the same row in D1. Lazy initializer ensures the
+  // value is created exactly once and is stable across re-renders.
+  const [profileId] = useState<string>(() =>
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? `voice-${crypto.randomUUID()}`
+      : `voice-${Math.random().toString(36).slice(2)}-${Date.now()}`,
+  );
 
   const [step, setStep] = useState<StepId>("welcome");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [dob, setDob] = useState("");
+  // Default the DOB to the latest valid date — i.e. 18 years ago today — so
+  // the system date picker opens anchored at the age-18 boundary instead of
+  // today's date. Users scroll back from there to their actual birth year.
+  const [dob, setDob] = useState<string>(() => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 18);
+    return today.toISOString().slice(0, 10);
+  });
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
   const [occupationType, setOccupationType] = useState<"work" | "school" | "">("");
@@ -200,6 +292,8 @@ export default function VoiceOnboardingPage() {
   const [gender, setGender] = useState("");
   const [preference, setPreference] = useState("");
   const [intent, setIntent] = useState<RelationshipIntent | "">("");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [instagram, setInstagram] = useState("");
   const [linkedin, setLinkedin] = useState("");
 
@@ -237,15 +331,14 @@ export default function VoiceOnboardingPage() {
     return today.toISOString().slice(0, 10);
   }, []);
 
-  const processAndSaveProfile = useCallback(
-    (data: ProfileData) => {
-      const resolvedFirstName = data.name || firstName;
-      const resolvedAge = data.age || ageNumber || 0;
-      const resolvedLocation = data.location || location;
-      const resolvedBio = data.bio || "";
-
-      if (!resolvedFirstName || !resolvedAge || !resolvedLocation || !resolvedBio) return;
-
+  /*
+   * Merge the form fields the user has typed so far with whatever the voice
+   * agent extracted (`data`) into a single RomanticProfile record. Form-typed
+   * values win because the user explicitly chose them; voice-extracted values
+   * fill in the long-form sections (bio, interests, values, etc.).
+   */
+  const buildProfile = useCallback(
+    (data: ProfileData): RomanticProfile => {
       const occupation: Occupation | undefined =
         data.occupation
           ? data.occupation
@@ -253,20 +346,21 @@ export default function VoiceOnboardingPage() {
             ? { type: occupationType, place: occupationPlace }
             : undefined;
 
-      const romanticProfile: RomanticProfile = {
-        id: `voice-${crypto.randomUUID()}`,
-        name: resolvedFirstName,
-        lastName: data.lastName || lastName || undefined,
-        age: resolvedAge,
-        phoneNumber: data.phoneNumber || (phone ? normalizePhone(phone) : undefined),
-        genderIdentity: data.genderIdentity || gender,
-        lookingFor: data.lookingFor || "",
-        location: resolvedLocation,
+      return {
+        id: profileId,
+        name: firstName || data.name || "You",
+        lastName: lastName || data.lastName || undefined,
+        age: ageNumber || data.age || 0,
+        phoneNumber: phone ? normalizePhone(phone) : data.phoneNumber || undefined,
+        genderIdentity: gender || data.genderIdentity || "",
+        lookingFor: data.lookingFor || preference || "",
+        location: location || data.location || "",
         occupation,
-        instagram: data.instagram || instagram || undefined,
-        linkedin: data.linkedin || linkedin || undefined,
-        relationshipIntent: (data.relationshipIntent || intent || "long-term") as RelationshipIntent,
-        bio: resolvedBio,
+        photoUrl: photoUrl || undefined,
+        instagram: instagram || data.instagram || undefined,
+        linkedin: linkedin || data.linkedin || undefined,
+        relationshipIntent: (intent || data.relationshipIntent || "long-term") as RelationshipIntent,
+        bio: data.bio || "",
         interests: data.interests || [],
         values: data.values || [],
         communicationStyle: data.communicationStyle || "balanced",
@@ -286,11 +380,6 @@ export default function VoiceOnboardingPage() {
         preferenceNotes: data.preferenceNotes || "",
         agentType: data.agentType || "hosted",
       };
-
-      saveProfile(romanticProfile);
-      syncProfileToServer(romanticProfile);
-      setIsComplete(true);
-      setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(romanticProfile.id)}`), 1800);
     },
     [
       ageNumber,
@@ -304,8 +393,38 @@ export default function VoiceOnboardingPage() {
       occupationPlace,
       occupationType,
       phone,
-      router,
+      photoUrl,
+      preference,
+      profileId,
     ],
+  );
+
+  /*
+   * Persist what we have so far. Called when the user reaches the voice step
+   * (so the form-only data lands in D1 even if they never start the call) and
+   * when the voice call ends (to merge in everything the agent extracted).
+   */
+  const persistProfile = useCallback(
+    (data: ProfileData = {}) => {
+      const profile = buildProfile(data);
+      saveProfile(profile);
+      syncProfileToServer(profile);
+      return profile;
+    },
+    [buildProfile],
+  );
+
+  /*
+   * Called only when the voice call ends — finalizes the profile, then
+   * redirects to the demo page once the row is on the server.
+   */
+  const finalizeAndRedirect = useCallback(
+    (data: ProfileData) => {
+      const profile = persistProfile(data);
+      setIsComplete(true);
+      setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(profile.id)}`), 1800);
+    },
+    [persistProfile, router],
   );
 
   useEffect(() => {
@@ -323,7 +442,7 @@ export default function VoiceOnboardingPage() {
         clearTimeout(callTimeoutRef.current);
         callTimeoutRef.current = null;
       }
-      processAndSaveProfile(profileRef.current);
+      finalizeAndRedirect(profileRef.current);
     });
 
     vapi.on("speech-start", () => setIsAssistantSpeaking(true));
@@ -354,15 +473,24 @@ export default function VoiceOnboardingPage() {
       if (callTimeoutRef.current) clearTimeout(callTimeoutRef.current);
       vapi.stop();
     };
-  }, [processAndSaveProfile]);
+  }, [finalizeAndRedirect]);
 
   function goNext() {
     setError(null);
 
-    // Branch: skip the "where" follow-up if the user picks "neither/skip" later — for now we always ask.
     const next = STEP_ORDER[stepIndex + 1];
     if (next) setStep(next);
   }
+
+  // When the user reaches the voice step, eagerly sync everything they typed
+  // so the row exists in D1 even if they never start (or finish) the voice call.
+  const hasSyncedRef = useRef(false);
+  useEffect(() => {
+    if (step === "voice" && !hasSyncedRef.current && firstName.trim() && location.trim()) {
+      hasSyncedRef.current = true;
+      persistProfile({});
+    }
+  }, [step, firstName, location, persistProfile]);
 
   function goBack() {
     setError(null);
@@ -438,19 +566,9 @@ export default function VoiceOnboardingPage() {
                 wtfradar
               </Link>
             )}
-            <span className="pill">
-              Step {stepIndex + 1} of {STEP_ORDER.length}
-            </span>
           </div>
 
-          <div className="step-progress" aria-hidden="true">
-            {STEP_ORDER.map((id, idx) => (
-              <span
-                key={id}
-                data-state={idx < stepIndex ? "done" : idx === stepIndex ? "active" : "upcoming"}
-              />
-            ))}
-          </div>
+          <PhaseProgress currentStep={step} />
         </header>
 
         {error && (
@@ -462,7 +580,6 @@ export default function VoiceOnboardingPage() {
         {step === "welcome" && (
           <section className="flex flex-1 flex-col justify-between gap-8">
             <div className="space-y-5">
-              <p className="pill w-fit">Welcome</p>
               <h1 className="text-5xl font-black leading-[0.95] tracking-[-0.05em] text-white">
                 Let&apos;s build your<br />wtf<span className="radar-text-gradient">radar</span> profile.
               </h1>
@@ -484,7 +601,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "name" && (
           <StepLayout
-            pill="A bit about you"
             title="What's your name?"
             description="Last names stay private until you and a match both agree to share."
             onContinue={goNext}
@@ -522,7 +638,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "dob" && (
           <StepLayout
-            pill="A bit about you"
             title="When's your birthday?"
             description="You must be 18 or older to use wtfradar. We only show your age, not your full birthday."
             onContinue={goNext}
@@ -531,20 +646,50 @@ export default function VoiceOnboardingPage() {
           >
             <label className="grid gap-1 text-sm font-bold text-white/84">
               <span className="text-xs uppercase tracking-[0.18em] text-white/52">Date of birth</span>
+              <button
+                type="button"
+                className="field date-trigger flex items-center justify-between text-left text-lg"
+                onClick={() => {
+                  const input = dateInputRef.current;
+                  if (!input) return;
+                  if (typeof input.showPicker === "function") {
+                    try {
+                      input.showPicker();
+                      return;
+                    } catch {
+                      // showPicker can throw if the input is not focused — fall through to focus+click.
+                    }
+                  }
+                  input.focus();
+                  input.click();
+                }}
+                aria-haspopup="dialog"
+                aria-label={
+                  dob ? `Change date of birth, currently ${formatDobDisplay(dob)}` : "Pick your date of birth"
+                }
+              >
+                <span className={dob ? "text-white" : "text-white/42"}>
+                  {dob ? formatDobDisplay(dob) : "Tap to pick a date"}
+                </span>
+                <span aria-hidden="true" className="text-white/56">
+                  📅
+                </span>
+              </button>
               <input
+                ref={dateInputRef}
                 type="date"
-                className="field date-field text-lg"
+                className="sr-only"
                 value={dob}
                 onChange={(event) => setDob(event.target.value)}
                 min={dobMinIso}
                 max={dobMaxIso}
-                autoFocus
-                aria-label="Date of birth"
+                tabIndex={-1}
+                aria-hidden="true"
               />
             </label>
             {ageIsValid ? (
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/52">
-                {formatDobDisplay(dob)} · you&apos;ll be shown as {ageNumber}
+                You&apos;ll be shown as {ageNumber}
               </p>
             ) : null}
           </StepLayout>
@@ -552,7 +697,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "phone" && (
           <StepLayout
-            pill="Account"
             title="What's your phone number?"
             description="We use it for verification and account recovery — never shared with matches."
             onContinue={goNext}
@@ -574,7 +718,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "location" && (
           <StepLayout
-            pill="Where you are"
             title="Where do you live?"
             description="City and state, or city and country. We use it to find nearby matches."
             onContinue={goNext}
@@ -594,7 +737,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "occupationType" && (
           <StepLayout
-            pill="What you're up to"
             title="What's your day job?"
             onContinue={goNext}
             continueDisabled={continueDisabled}
@@ -620,7 +762,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "occupationPlace" && (
           <StepLayout
-            pill="What you're up to"
             title={
               occupationType === "school" ? "Where do you study?" : "Where do you work?"
             }
@@ -646,7 +787,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "gender" && (
           <StepLayout
-            pill="About you"
             title="I am a..."
             description="Pick the option that fits best — you can be more specific in the voice chat."
             onContinue={goNext}
@@ -670,7 +810,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "preference" && (
           <StepLayout
-            pill="Who you're looking for"
             title="I'm attracted to..."
             description="This helps your agent line up the right virtual dates."
             onContinue={goNext}
@@ -694,7 +833,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "intent" && (
           <StepLayout
-            pill="What you want"
             title="What kind of relationship?"
             description="Be honest — your agent will only match you with people who want similar things."
             onContinue={goNext}
@@ -719,9 +857,28 @@ export default function VoiceOnboardingPage() {
           </StepLayout>
         )}
 
+        {step === "photo" && (
+          <StepLayout
+            title="Add a profile photo"
+            description="One clear photo of you. We never share it with matches until you both opt in."
+            onContinue={goNext}
+            continueDisabled={false}
+            continueLabel={photoUrl ? "Continue" : "Skip for now"}
+            error={photoError ?? undefined}
+          >
+            <PhotoPicker
+              photoUrl={photoUrl}
+              onChange={(value) => {
+                setPhotoError(null);
+                setPhotoUrl(value);
+              }}
+              onError={(message) => setPhotoError(message)}
+            />
+          </StepLayout>
+        )}
+
         {step === "socials" && (
           <StepLayout
-            pill="Optional"
             title="Add your socials?"
             description="Totally optional — you can add or remove these any time. Only shared after you both opt in."
             onContinue={goNext}
@@ -758,9 +915,6 @@ export default function VoiceOnboardingPage() {
         {step === "voice" && (
           <section className="flex flex-1 flex-col items-center justify-between gap-10 text-center">
             <div className="space-y-3">
-              <p className="pill mx-auto w-fit">
-                {isComplete ? "All set" : isCallActive ? "Listening" : "Voice chat"}
-              </p>
               <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">
                 {isComplete
                   ? "Profile saved."
@@ -824,8 +978,50 @@ export default function VoiceOnboardingPage() {
   );
 }
 
+function PhaseProgress({ currentStep }: { currentStep: StepId }) {
+  const segments = getPhaseProgress(currentStep);
+  const activePhase = segments.find((s) => s.state === "active")?.phase ?? PHASES[0];
+  const allDone = currentStep === "voice";
+
+  return (
+    <div className="space-y-2">
+      <div className="phase-progress" role="progressbar" aria-valuemin={0} aria-valuemax={3} aria-valuenow={segments.filter((s) => s.state === "done").length + (allDone ? 1 : 0)}>
+        {segments.map(({ phase, state, fillRatio }) => (
+          <div key={phase.id} className="phase-progress-segment" data-state={state}>
+            <span
+              className="phase-progress-fill"
+              style={state === "active" ? { width: `${fillRatio * 100}%` } : undefined}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.18em]">
+        {segments.map(({ phase, state }) => (
+          <span
+            key={phase.id}
+            className={
+              state === "done"
+                ? "text-white/82"
+                : state === "active"
+                  ? "text-white"
+                  : "text-white/30"
+            }
+          >
+            {state === "done" ? phase.doneLabel : state === "active" ? phase.inProgressLabel : phase.label}
+          </span>
+        ))}
+      </div>
+      <p
+        aria-live="polite"
+        className="text-xs text-white/52"
+      >
+        {allDone ? "🎉 You did it." : activePhase.id === "basics" ? "Quick basics — almost nothing to fill in." : activePhase.id === "vibe" ? "Now the fun stuff. Show your vibe." : "Time to meet your AI agent."}
+      </p>
+    </div>
+  );
+}
+
 function StepLayout({
-  pill,
   title,
   description,
   children,
@@ -834,7 +1030,6 @@ function StepLayout({
   continueLabel = "Continue",
   error,
 }: {
-  pill: string;
   title: string;
   description?: string;
   children: React.ReactNode;
@@ -846,7 +1041,6 @@ function StepLayout({
   return (
     <section className="flex flex-1 flex-col justify-between gap-8">
       <div className="space-y-5">
-        <p className="pill w-fit">{pill}</p>
         <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">{title}</h1>
         {description ? <p className="text-sm leading-6 text-white/62">{description}</p> : null}
         <div className="space-y-3">{children}</div>

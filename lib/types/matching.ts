@@ -43,6 +43,7 @@ export type RomanticProfile = {
   lookingFor: string;
   location: string;
   occupation?: Occupation;
+  photoUrl?: string;
   instagram?: string;
   linkedin?: string;
   relationshipIntent: RelationshipIntent;
