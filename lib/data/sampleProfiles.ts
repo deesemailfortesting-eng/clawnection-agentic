@@ -17,7 +17,38 @@ function createProfileFromSeed(seed: DemoProfileSeed): RomanticProfile {
   };
 }
 
+export const SAM_PROFILE_ID = "sample-sam";
+
 export const sampleProfileSeeds: DemoProfileSeed[] = [
+  {
+    archetype: "Curious explorer — travel, food, adventure",
+    scenarioTags: ["exploring", "hosted-agent", "open"],
+    profile: {
+      id: SAM_PROFILE_ID,
+      name: "Sam",
+      age: 30,
+      genderIdentity: "Person",
+      lookingFor: "Everyone",
+      location: "New York, NY",
+      relationshipIntent: "exploring",
+      bio: "Happiest with a passport in hand or hunting down the best new restaurant in the neighbourhood. Curious about how people think, what they love, and what they're still figuring out.",
+      interests: ["travel", "food", "cooking", "hiking", "photography"],
+      values: ["curiosity", "adventure", "authenticity", "openness"],
+      communicationStyle: "warm",
+      lifestyleHabits: {
+        sleepSchedule: "flexible",
+        socialEnergy: "balanced",
+        activityLevel: "active",
+        drinking: "social",
+        smoking: "never",
+      },
+      dealbreakers: ["dishonesty", "close-mindedness"],
+      idealFirstDate: "A food crawl through a neighbourhood neither of us has tried yet — three spots, share everything.",
+      preferenceAgeRange: { min: 20, max: 50 },
+      preferenceNotes: "Looking for genuine curiosity and a willingness to be surprised.",
+      agentType: "hosted",
+    },
+  },
   {
     archetype: "Warm designer seeking consistency",
     scenarioTags: ["long-term", "hosted-agent", "boston-metro"],
