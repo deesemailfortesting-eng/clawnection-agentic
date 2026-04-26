@@ -59,3 +59,5 @@ Open `http://localhost:3000`.
 - Add OpenClaw support and richer multi-agent orchestration.
 
 For a condensed roadmap, see `PROJECT_SPEC.md`.
+
+For the current layered system direction, see `ARCHITECTURE.md`.
