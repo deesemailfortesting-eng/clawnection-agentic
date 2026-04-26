@@ -2,6 +2,8 @@ import {
   ParsedMessage,
   SignalConfidence,
   SignalSensitivity,
+  WhatsAppAttachmentPatternProfile,
+  WhatsAppCommunicationStyleProfile,
   WhatsAppConversationSignalProfile,
   WhatsAppCoverageSummary,
   WhatsAppSignalExtractionMetadata,
@@ -25,6 +27,13 @@ type ExtractSignalOptions = {
 function mean(values: number[]): number {
   if (values.length === 0) return 0;
   return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+function percentile(values: number[], ratio: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * ratio) - 1));
+  return sorted[index];
 }
 
 function stdDev(values: number[]): number {
@@ -114,6 +123,39 @@ function uniqueActiveDays(messages: ParsedMessage[]): number {
   return new Set(messages.map((message) => message.timestamp.toISOString().slice(0, 10))).size;
 }
 
+function getDayBucket(hour: number): "day" | "night" {
+  return hour >= 7 && hour < 21 ? "day" : "night";
+}
+
+function safeRatio(numerator: number, denominator: number): number {
+  if (denominator <= 0) return 0;
+  return numerator / denominator;
+}
+
+function clampUnit(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function getMessageLength(message: ParsedMessage): number {
+  return message.body === "<Media omitted>" || message.body === "‎<Media omitted>" ? 0 : message.body.length;
+}
+
+function countPunctuationSignals(text: string): number {
+  return (text.match(/[!?]/g) ?? []).length;
+}
+
+function averageDailyActivity(messages: ParsedMessage[]): number {
+  const days = uniqueActiveDays(messages);
+  return days === 0 ? 0 : messages.length / days;
+}
+
+function conversationLongevityDays(messages: ParsedMessage[]): number {
+  if (messages.length < 2) return messages.length === 0 ? 0 : 1;
+  const earliest = messages[0].timestamp.getTime();
+  const latest = messages[messages.length - 1].timestamp.getTime();
+  return Math.max(1, Math.round((latest - earliest) / (24 * 60 * 60 * 1000)));
+}
+
 function getCoverageQuality(ownerMessageCount: number, totalMessages: number): SignalConfidence {
   if (ownerMessageCount < LOW_CONFIDENCE_THRESHOLD || totalMessages < LOW_CONFIDENCE_THRESHOLD * 2) return "low";
   if (ownerMessageCount < 75 || totalMessages < 150) return "medium";
@@ -152,6 +194,128 @@ function buildCoverageSummary(
   };
 }
 
+function buildCommunicationStyleProfile(
+  nonSystem: ParsedMessage[],
+  ownerMessages: ParsedMessage[],
+  otherMessages: ParsedMessage[],
+  userName: string,
+): WhatsAppCommunicationStyleProfile {
+  const latencies = computeResponseLatencies(nonSystem, userName);
+  const avgResponseLatencyMs = mean(latencies);
+  const ownerMessageLengths = ownerMessages.map(getMessageLength);
+  const otherMessageLengths = otherMessages.map(getMessageLength);
+  const ownerQuestionRatio = safeRatio(ownerMessages.filter((message) => message.body.includes("?")).length, ownerMessages.length);
+  const longMessageRatio = safeRatio(ownerMessageLengths.filter((length) => length > 50).length, ownerMessages.length);
+  const initiationRatio = computeInitiationRatio(nonSystem, userName);
+  const derivedStyle = deriveCommunicationStyle(
+    ownerQuestionRatio,
+    computeEmojiDensity(ownerMessages),
+    longMessageRatio,
+    mean(ownerMessageLengths),
+    initiationRatio,
+  );
+
+  const weekdayLatencies = latencies.filter((_, index) => {
+    const ownerMessage = ownerMessages[index];
+    return ownerMessage ? ![0, 6].includes(ownerMessage.timestamp.getDay()) : false;
+  });
+  const weekendLatencies = latencies.filter((_, index) => {
+    const ownerMessage = ownerMessages[index];
+    return ownerMessage ? [0, 6].includes(ownerMessage.timestamp.getDay()) : false;
+  });
+  const dayMessages = ownerMessages.filter((message) => getDayBucket(message.timestamp.getHours()) === "day");
+  const nightMessages = ownerMessages.filter((message) => getDayBucket(message.timestamp.getHours()) === "night");
+  const ownerEmojiDensity = computeEmojiDensity(ownerMessages);
+  const otherEmojiDensity = computeEmojiDensity(otherMessages);
+
+  return {
+    derivedStyle,
+    responseLatencyProfile: {
+      medianMinutesToReply: Math.round(percentile(latencies, 0.5) / 60_000),
+      p90MinutesToReply: Math.round(percentile(latencies, 0.9) / 60_000),
+      weekdayVsWeekendShift: mean(weekdayLatencies) - mean(weekendLatencies),
+      dayVsNightShift: mean(dayMessages.map((message) => getMessageLength(message))) - mean(nightMessages.map((message) => getMessageLength(message))),
+      consistency: avgResponseLatencyMs === 0 ? "low" : getConfidence(ownerMessages.length),
+      confidence: getConfidence(ownerMessages.length),
+    },
+    initiationProfile: {
+      ownerInitiationRatio: initiationRatio,
+      conversationRestartRatio: initiationRatio,
+      followThroughRatio: clampUnit(safeRatio(ownerMessages.length, Math.max(otherMessages.length, 1))),
+      confidence: getConfidence(ownerMessages.length),
+    },
+    messageDepthProfile: {
+      averageOwnerMessageLength: mean(ownerMessageLengths),
+      averageOtherMessageLength: mean(otherMessageLengths),
+      longMessageRatio,
+      questionAskingRatio: ownerQuestionRatio,
+      threadDepthIndex: safeRatio(nonSystem.length, Math.max(uniqueActiveDays(nonSystem), 1)),
+      confidence: getConfidence(ownerMessages.length),
+    },
+    mirroringProfile: {
+      tempoMirroring: clampUnit(1 - safeRatio(Math.abs(avgResponseLatencyMs - mean(latencies)), Math.max(avgResponseLatencyMs, 1))),
+      lengthMirroring: clampUnit(1 - safeRatio(Math.abs(mean(ownerMessageLengths) - mean(otherMessageLengths)), Math.max(mean(ownerMessageLengths), mean(otherMessageLengths), 1))),
+      emojiMirroring: clampUnit(1 - Math.abs(ownerEmojiDensity - otherEmojiDensity)),
+      punctuationMirroring: clampUnit(1 - safeRatio(Math.abs(mean(ownerMessages.map((message) => countPunctuationSignals(message.body))) - mean(otherMessages.map((message) => countPunctuationSignals(message.body)))), 5)),
+      confidence: getConfidence(ownerMessages.length),
+    },
+    conflictStyleProfile: {
+      repairAfterTensionIndex: clampUnit(safeRatio(ownerMessages.filter((message) => /sorry|thanks|appreciate|understand/i.test(message.body)).length, ownerMessages.length)),
+      escalationTendency: clampUnit(safeRatio(ownerMessages.filter((message) => /!{2,}|\bnever\b|\balways\b/i.test(message.body)).length, ownerMessages.length)),
+      avoidanceTendency: clampUnit(1 - ownerQuestionRatio),
+      directnessAfterConflict: clampUnit(safeRatio(ownerMessages.filter((message) => /let'?s|should we|can we|need to/i.test(message.body)).length, ownerMessages.length)),
+      confidence: getConfidence(ownerMessages.length),
+      sensitivityClass: "private-only",
+    },
+    expressivenessProfile: {
+      emojiDensity: ownerEmojiDensity,
+      punctuationIntensity: mean(ownerMessages.map((message) => countPunctuationSignals(message.body))),
+      emotionalVocabularyRange: clampUnit(safeRatio(new Set(ownerMessages.flatMap((message) => (message.body.toLowerCase().match(/\b(love|miss|excited|happy|sad|frustrated|nervous|calm)\b/g) ?? []))).size, 8)),
+      humorSignalStrength: clampUnit(safeRatio(ownerMessages.filter((message) => /lol|lmao|haha|hehe|jkjk/i.test(message.body)).length, ownerMessages.length)),
+      confidence: getConfidence(ownerMessages.length),
+    },
+  };
+}
+
+function buildAttachmentPatternProfile(
+  nonSystem: ParsedMessage[],
+  ownerMessages: ParsedMessage[],
+  otherMessages: ParsedMessage[],
+  userName: string,
+): WhatsAppAttachmentPatternProfile {
+  const latencies = computeResponseLatencies(nonSystem, userName);
+  const closeTieStabilityScore = computeCloseTieStability(nonSystem, userName);
+  const ownerQuestionRatio = safeRatio(ownerMessages.filter((message) => message.body.includes("?")).length, ownerMessages.length);
+  const followUpRatio = safeRatio(ownerMessages.filter((message) => /\?$/.test(message.body.trim())).length, ownerMessages.length);
+  const acknowledgmentRatio = safeRatio(ownerMessages.filter((message) => /thanks|got it|sounds good|okay|ok\b/i.test(message.body)).length, ownerMessages.length);
+
+  return {
+    consistencyProfile: {
+      responseConsistency: latencies.length === 0 ? "low" : getConfidence(ownerMessages.length),
+      initiationConsistency: getConfidence(ownerMessages.length),
+      emotionalConsistency: getConfidence(Math.min(ownerMessages.length, otherMessages.length)),
+      confidence: getConfidence(ownerMessages.length),
+    },
+    relationshipStabilityProfile: {
+      closeTieStabilityScore,
+      activeDaysPerWeek: averageDailyActivity(nonSystem) * 7,
+      conversationLongevityDays: conversationLongevityDays(nonSystem),
+      confidence: getConfidence(ownerMessages.length),
+    },
+    reengagementProfile: {
+      restartAfterGapRatio: computeInitiationRatio(nonSystem, userName),
+      ownerReengagementShare: computeInitiationRatio(nonSystem, userName),
+      confidence: getConfidence(ownerMessages.length),
+    },
+    closenessMaintenanceProfile: {
+      questionAskingRatio: ownerQuestionRatio,
+      followUpRatio,
+      acknowledgmentRatio,
+      confidence: getConfidence(ownerMessages.length),
+    },
+  };
+}
+
 function buildConversationProfile(
   messages: ParsedMessage[],
   userName: string,
@@ -161,11 +325,11 @@ function buildConversationProfile(
   const userNorm = normalizedSenderName(userName);
   const ownerMessages = nonSystem.filter((message) => normalizedSenderName(message.sender) === userNorm);
   const otherMessages = nonSystem.filter((message) => normalizedSenderName(message.sender) !== userNorm);
-  const latencies = computeResponseLatencies(nonSystem, userName);
-  const avgResponseLatencyMs = mean(latencies);
   const uniqueOtherParticipants = new Set(otherMessages.map((message) => normalizedSenderName(message.sender)));
   const participantCount = uniqueOtherParticipants.size + 1;
   const confidence = getCoverageQuality(ownerMessages.length, nonSystem.length);
+  const communicationStyle = buildCommunicationStyleProfile(nonSystem, ownerMessages, otherMessages, userName);
+  const attachmentPattern = buildAttachmentPatternProfile(nonSystem, ownerMessages, otherMessages, userName);
 
   return {
     conversationId,
@@ -179,33 +343,26 @@ function buildConversationProfile(
       isSignalEligible: ownerMessages.length >= 5 && otherMessages.length >= 5 && nonSystem.length >= 20,
       confidence,
     },
-    communicationStyle: {
-      derivedStyle: deriveCommunicationStyle(
-        ownerMessages.length === 0 ? 0 : ownerMessages.filter((message) => message.body.includes("?")).length / ownerMessages.length,
-        computeEmojiDensity(ownerMessages),
-        ownerMessages.length === 0 ? 0 : ownerMessages.filter((message) => message.body.length > 50).length / ownerMessages.length,
-        mean(ownerMessages.map((message) => message.body === "<Media omitted>" || message.body === "‎<Media omitted>" ? 0 : message.body.length)),
-        computeInitiationRatio(nonSystem, userName),
-      ),
-      avgResponseLatencyMs,
-      initiationRatio: computeInitiationRatio(nonSystem, userName),
-      longMessageRatio: ownerMessages.length === 0 ? 0 : ownerMessages.filter((message) => message.body.length > 50).length / ownerMessages.length,
-      emojiDensity: computeEmojiDensity(ownerMessages),
-    },
-    attachmentPattern: {
-      closeTieStabilityScore: computeCloseTieStability(nonSystem, userName),
-      responseConsistency: avgResponseLatencyMs === 0 ? "low" : getConfidence(ownerMessages.length),
-    },
+    communicationStyle,
+    attachmentPattern,
     policyTags: uniqueOtherParticipants.size > 1 ? ["private-only"] : ["shareable-summary"],
   };
 }
 
 function buildGlobalProfile(
+  communicationStyle: WhatsAppCommunicationStyleProfile,
+  attachmentPattern: WhatsAppAttachmentPatternProfile,
   coverageSummary: WhatsAppCoverageSummary,
   shareableSummary: WhatsAppSignals["shareableSummary"],
-  closeTieStabilityScore: number,
 ): WhatsAppGlobalSignalProfile {
   return {
+    communicationStyle,
+    attachmentPattern,
+    stabilityMetrics: {
+      responseConsistency: communicationStyle.responseLatencyProfile.consistency,
+      relationshipStability: attachmentPattern.relationshipStabilityProfile.confidence,
+      coverageQuality: coverageSummary.coverageQuality,
+    },
     coverage: coverageSummary,
     shareableSummaryCandidates: shareableSummary.map((summary) => ({
       summaryKey: summary.label.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
@@ -217,7 +374,7 @@ function buildGlobalProfile(
     privateOnlySignals: [
       {
         signalKey: "close_tie_stability",
-        value: closeTieStabilityScore.toFixed(2),
+        value: attachmentPattern.relationshipStabilityProfile.closeTieStabilityScore.toFixed(2),
         reason: "Internal relationship-pattern signal used for downstream reasoning only.",
         sensitivityClass: "private-only",
       },
@@ -467,6 +624,125 @@ export function mergeSignals(signalsList: WhatsAppSignals[]): WhatsAppSignals {
     new Date(Math.max(...allLatest)),
   );
 
+  const primaryConversation = conversationProfiles[0];
+  const globalCommunicationStyle: WhatsAppCommunicationStyleProfile = primaryConversation
+    ? {
+        ...primaryConversation.communicationStyle,
+        derivedStyle: derivedCommunicationStyle,
+        responseLatencyProfile: {
+          ...primaryConversation.communicationStyle.responseLatencyProfile,
+          medianMinutesToReply: Math.round(avgResponseLatencyMs / 60_000),
+          p90MinutesToReply: Math.round((avgResponseLatencyMs + responseLatencyStdDevMs) / 60_000),
+          consistency: totalUserMessages < LOW_CONFIDENCE_THRESHOLD ? "low" : getConfidence(totalUserMessages),
+          confidence: getConfidence(totalUserMessages),
+        },
+        initiationProfile: {
+          ...primaryConversation.communicationStyle.initiationProfile,
+          ownerInitiationRatio: initiationRatio,
+          conversationRestartRatio: initiationRatio,
+          confidence: getConfidence(totalUserMessages),
+        },
+        messageDepthProfile: {
+          ...primaryConversation.communicationStyle.messageDepthProfile,
+          averageOwnerMessageLength: avgMessageLength,
+          longMessageRatio,
+          questionAskingRatio: questionRatio,
+          confidence: getConfidence(totalUserMessages),
+        },
+        expressivenessProfile: {
+          ...primaryConversation.communicationStyle.expressivenessProfile,
+          emojiDensity,
+          confidence: getConfidence(totalUserMessages),
+        },
+      }
+    : {
+        derivedStyle: derivedCommunicationStyle,
+        responseLatencyProfile: {
+          medianMinutesToReply: Math.round(avgResponseLatencyMs / 60_000),
+          p90MinutesToReply: Math.round((avgResponseLatencyMs + responseLatencyStdDevMs) / 60_000),
+          weekdayVsWeekendShift: 0,
+          dayVsNightShift: 0,
+          consistency: getConfidence(totalUserMessages),
+          confidence: getConfidence(totalUserMessages),
+        },
+        initiationProfile: {
+          ownerInitiationRatio: initiationRatio,
+          conversationRestartRatio: initiationRatio,
+          followThroughRatio: clampUnit(initiationRatio),
+          confidence: getConfidence(totalUserMessages),
+        },
+        messageDepthProfile: {
+          averageOwnerMessageLength: avgMessageLength,
+          averageOtherMessageLength: avgMessageLength,
+          longMessageRatio,
+          questionAskingRatio: questionRatio,
+          threadDepthIndex: 0,
+          confidence: getConfidence(totalUserMessages),
+        },
+        mirroringProfile: {
+          tempoMirroring: 0,
+          lengthMirroring: 0,
+          emojiMirroring: 0,
+          punctuationMirroring: 0,
+          confidence: getConfidence(totalUserMessages),
+        },
+        conflictStyleProfile: {
+          repairAfterTensionIndex: 0,
+          escalationTendency: 0,
+          avoidanceTendency: 0,
+          directnessAfterConflict: 0,
+          confidence: getConfidence(totalUserMessages),
+          sensitivityClass: "private-only",
+        },
+        expressivenessProfile: {
+          emojiDensity,
+          punctuationIntensity: 0,
+          emotionalVocabularyRange: 0,
+          humorSignalStrength: 0,
+          confidence: getConfidence(totalUserMessages),
+        },
+      };
+
+  const globalAttachmentPattern: WhatsAppAttachmentPatternProfile = primaryConversation
+    ? {
+        ...primaryConversation.attachmentPattern,
+        consistencyProfile: {
+          ...primaryConversation.attachmentPattern.consistencyProfile,
+          responseConsistency: responseLatencyStdDevMs > avgResponseLatencyMs && avgResponseLatencyMs > 0 ? "low" : getConfidence(totalUserMessages),
+          confidence: getConfidence(totalUserMessages),
+        },
+        relationshipStabilityProfile: {
+          ...primaryConversation.attachmentPattern.relationshipStabilityProfile,
+          closeTieStabilityScore,
+          confidence: getConfidence(totalUserMessages),
+        },
+      }
+    : {
+        consistencyProfile: {
+          responseConsistency: getConfidence(totalUserMessages),
+          initiationConsistency: getConfidence(totalUserMessages),
+          emotionalConsistency: getConfidence(totalUserMessages),
+          confidence: getConfidence(totalUserMessages),
+        },
+        relationshipStabilityProfile: {
+          closeTieStabilityScore,
+          activeDaysPerWeek: 0,
+          conversationLongevityDays: 0,
+          confidence: getConfidence(totalUserMessages),
+        },
+        reengagementProfile: {
+          restartAfterGapRatio: initiationRatio,
+          ownerReengagementShare: initiationRatio,
+          confidence: getConfidence(totalUserMessages),
+        },
+        closenessMaintenanceProfile: {
+          questionAskingRatio: questionRatio,
+          followUpRatio: questionRatio,
+          acknowledgmentRatio: 0,
+          confidence: getConfidence(totalUserMessages),
+        },
+      };
+
   const mergedSignals: WhatsAppSignals = {
     avgResponseLatencyMs,
     responseLatencyStdDevMs,
@@ -494,6 +770,13 @@ export function mergeSignals(signalsList: WhatsAppSignals[]): WhatsAppSignals {
     coverageSummary,
     conversationProfiles,
     globalProfile: {
+      communicationStyle: globalCommunicationStyle,
+      attachmentPattern: globalAttachmentPattern,
+      stabilityMetrics: {
+        responseConsistency: globalAttachmentPattern.consistencyProfile.responseConsistency,
+        relationshipStability: globalAttachmentPattern.relationshipStabilityProfile.confidence,
+        coverageQuality: coverageSummary.coverageQuality,
+      },
       coverage: coverageSummary,
       shareableSummaryCandidates: [],
       privateOnlySignals: [],
@@ -502,9 +785,10 @@ export function mergeSignals(signalsList: WhatsAppSignals[]): WhatsAppSignals {
 
   mergedSignals.shareableSummary = buildShareableSummary(mergedSignals);
   mergedSignals.globalProfile = buildGlobalProfile(
+    globalCommunicationStyle,
+    globalAttachmentPattern,
     coverageSummary,
     mergedSignals.shareableSummary,
-    mergedSignals.closeTieStabilityScore,
   );
 
   return mergedSignals;
@@ -588,6 +872,8 @@ export function extractSignals(
     earliest,
     latest,
   );
+  const communicationStyleProfile = conversationProfiles[0].communicationStyle;
+  const attachmentPatternProfile = conversationProfiles[0].attachmentPattern;
 
   const signals: WhatsAppSignals = {
     avgResponseLatencyMs: avgLatencyMs,
@@ -613,6 +899,13 @@ export function extractSignals(
     coverageSummary,
     conversationProfiles,
     globalProfile: {
+      communicationStyle: communicationStyleProfile,
+      attachmentPattern: attachmentPatternProfile,
+      stabilityMetrics: {
+        responseConsistency: attachmentPatternProfile.consistencyProfile.responseConsistency,
+        relationshipStability: attachmentPatternProfile.relationshipStabilityProfile.confidence,
+        coverageQuality: coverageSummary.coverageQuality,
+      },
       coverage: coverageSummary,
       shareableSummaryCandidates: [],
       privateOnlySignals: [],
@@ -621,9 +914,10 @@ export function extractSignals(
 
   signals.shareableSummary = buildShareableSummary(signals);
   signals.globalProfile = buildGlobalProfile(
+    communicationStyleProfile,
+    attachmentPatternProfile,
     coverageSummary,
     signals.shareableSummary,
-    signals.closeTieStabilityScore,
   );
 
   return signals;
