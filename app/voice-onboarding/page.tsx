@@ -187,6 +187,16 @@ export default function VoiceOnboardingPage() {
   const vapiRef = useRef<Vapi | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<ProfileData>({});
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Stable id created once per onboarding session so every partial sync to
+  // /api/profiles upserts the same row in D1. Lazy initializer ensures the
+  // value is created exactly once and is stable across re-renders.
+  const [profileId] = useState<string>(() =>
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? `voice-${crypto.randomUUID()}`
+      : `voice-${Math.random().toString(36).slice(2)}-${Date.now()}`,
+  );
 
   const [step, setStep] = useState<StepId>("welcome");
 
@@ -237,15 +247,14 @@ export default function VoiceOnboardingPage() {
     return today.toISOString().slice(0, 10);
   }, []);
 
-  const processAndSaveProfile = useCallback(
-    (data: ProfileData) => {
-      const resolvedFirstName = data.name || firstName;
-      const resolvedAge = data.age || ageNumber || 0;
-      const resolvedLocation = data.location || location;
-      const resolvedBio = data.bio || "";
-
-      if (!resolvedFirstName || !resolvedAge || !resolvedLocation || !resolvedBio) return;
-
+  /*
+   * Merge the form fields the user has typed so far with whatever the voice
+   * agent extracted (`data`) into a single RomanticProfile record. Form-typed
+   * values win because the user explicitly chose them; voice-extracted values
+   * fill in the long-form sections (bio, interests, values, etc.).
+   */
+  const buildProfile = useCallback(
+    (data: ProfileData): RomanticProfile => {
       const occupation: Occupation | undefined =
         data.occupation
           ? data.occupation
@@ -253,20 +262,20 @@ export default function VoiceOnboardingPage() {
             ? { type: occupationType, place: occupationPlace }
             : undefined;
 
-      const romanticProfile: RomanticProfile = {
-        id: `voice-${crypto.randomUUID()}`,
-        name: resolvedFirstName,
-        lastName: data.lastName || lastName || undefined,
-        age: resolvedAge,
-        phoneNumber: data.phoneNumber || (phone ? normalizePhone(phone) : undefined),
-        genderIdentity: data.genderIdentity || gender,
-        lookingFor: data.lookingFor || "",
-        location: resolvedLocation,
+      return {
+        id: profileId,
+        name: firstName || data.name || "You",
+        lastName: lastName || data.lastName || undefined,
+        age: ageNumber || data.age || 0,
+        phoneNumber: phone ? normalizePhone(phone) : data.phoneNumber || undefined,
+        genderIdentity: gender || data.genderIdentity || "",
+        lookingFor: data.lookingFor || preference || "",
+        location: location || data.location || "",
         occupation,
-        instagram: data.instagram || instagram || undefined,
-        linkedin: data.linkedin || linkedin || undefined,
-        relationshipIntent: (data.relationshipIntent || intent || "long-term") as RelationshipIntent,
-        bio: resolvedBio,
+        instagram: instagram || data.instagram || undefined,
+        linkedin: linkedin || data.linkedin || undefined,
+        relationshipIntent: (intent || data.relationshipIntent || "long-term") as RelationshipIntent,
+        bio: data.bio || "",
         interests: data.interests || [],
         values: data.values || [],
         communicationStyle: data.communicationStyle || "balanced",
@@ -286,11 +295,6 @@ export default function VoiceOnboardingPage() {
         preferenceNotes: data.preferenceNotes || "",
         agentType: data.agentType || "hosted",
       };
-
-      saveProfile(romanticProfile);
-      syncProfileToServer(romanticProfile);
-      setIsComplete(true);
-      setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(romanticProfile.id)}`), 1800);
     },
     [
       ageNumber,
@@ -304,8 +308,37 @@ export default function VoiceOnboardingPage() {
       occupationPlace,
       occupationType,
       phone,
-      router,
+      preference,
+      profileId,
     ],
+  );
+
+  /*
+   * Persist what we have so far. Called when the user reaches the voice step
+   * (so the form-only data lands in D1 even if they never start the call) and
+   * when the voice call ends (to merge in everything the agent extracted).
+   */
+  const persistProfile = useCallback(
+    (data: ProfileData = {}) => {
+      const profile = buildProfile(data);
+      saveProfile(profile);
+      syncProfileToServer(profile);
+      return profile;
+    },
+    [buildProfile],
+  );
+
+  /*
+   * Called only when the voice call ends — finalizes the profile, then
+   * redirects to the demo page once the row is on the server.
+   */
+  const finalizeAndRedirect = useCallback(
+    (data: ProfileData) => {
+      const profile = persistProfile(data);
+      setIsComplete(true);
+      setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(profile.id)}`), 1800);
+    },
+    [persistProfile, router],
   );
 
   useEffect(() => {
@@ -323,7 +356,7 @@ export default function VoiceOnboardingPage() {
         clearTimeout(callTimeoutRef.current);
         callTimeoutRef.current = null;
       }
-      processAndSaveProfile(profileRef.current);
+      finalizeAndRedirect(profileRef.current);
     });
 
     vapi.on("speech-start", () => setIsAssistantSpeaking(true));
@@ -354,15 +387,24 @@ export default function VoiceOnboardingPage() {
       if (callTimeoutRef.current) clearTimeout(callTimeoutRef.current);
       vapi.stop();
     };
-  }, [processAndSaveProfile]);
+  }, [finalizeAndRedirect]);
 
   function goNext() {
     setError(null);
 
-    // Branch: skip the "where" follow-up if the user picks "neither/skip" later — for now we always ask.
     const next = STEP_ORDER[stepIndex + 1];
     if (next) setStep(next);
   }
+
+  // When the user reaches the voice step, eagerly sync everything they typed
+  // so the row exists in D1 even if they never start (or finish) the voice call.
+  const hasSyncedRef = useRef(false);
+  useEffect(() => {
+    if (step === "voice" && !hasSyncedRef.current && firstName.trim() && location.trim()) {
+      hasSyncedRef.current = true;
+      persistProfile({});
+    }
+  }, [step, firstName, location, persistProfile]);
 
   function goBack() {
     setError(null);
@@ -531,20 +573,50 @@ export default function VoiceOnboardingPage() {
           >
             <label className="grid gap-1 text-sm font-bold text-white/84">
               <span className="text-xs uppercase tracking-[0.18em] text-white/52">Date of birth</span>
+              <button
+                type="button"
+                className="field date-trigger flex items-center justify-between text-left text-lg"
+                onClick={() => {
+                  const input = dateInputRef.current;
+                  if (!input) return;
+                  if (typeof input.showPicker === "function") {
+                    try {
+                      input.showPicker();
+                      return;
+                    } catch {
+                      // showPicker can throw if the input is not focused — fall through to focus+click.
+                    }
+                  }
+                  input.focus();
+                  input.click();
+                }}
+                aria-haspopup="dialog"
+                aria-label={
+                  dob ? `Change date of birth, currently ${formatDobDisplay(dob)}` : "Pick your date of birth"
+                }
+              >
+                <span className={dob ? "text-white" : "text-white/42"}>
+                  {dob ? formatDobDisplay(dob) : "Tap to pick a date"}
+                </span>
+                <span aria-hidden="true" className="text-white/56">
+                  📅
+                </span>
+              </button>
               <input
+                ref={dateInputRef}
                 type="date"
-                className="field date-field text-lg"
+                className="sr-only"
                 value={dob}
                 onChange={(event) => setDob(event.target.value)}
                 min={dobMinIso}
                 max={dobMaxIso}
-                autoFocus
-                aria-label="Date of birth"
+                tabIndex={-1}
+                aria-hidden="true"
               />
             </label>
             {ageIsValid ? (
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/52">
-                {formatDobDisplay(dob)} · you&apos;ll be shown as {ageNumber}
+                You&apos;ll be shown as {ageNumber}
               </p>
             ) : null}
           </StepLayout>

@@ -278,6 +278,26 @@ select.field option {
   color: rgba(255, 255, 255, 0.42);
 }
 
+/*
+ * The date trigger is the visible button. The actual <input type="date"> is
+ * sr-only and is opened via showPicker() when the user taps the trigger. This
+ * stops the iOS / Chrome date picker from popping up the moment the screen
+ * mounts.
+ */
+.date-trigger {
+  cursor: pointer;
+}
+
+.date-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.date-trigger:focus-visible {
+  border-color: rgba(255, 122, 24, 0.9);
+  box-shadow: 0 0 0 4px rgba(255, 122, 24, 0.14);
+}
+
 .primary-button {
   display: inline-flex;
   min-height: 48px;
