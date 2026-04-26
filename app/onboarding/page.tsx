@@ -1,8 +1,10 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { OnboardingSection } from "@/components/OnboardingSection";
+import { PhoneShell } from "@/components/PhoneShell";
 import { saveProfile, saveSignals, saveGap, syncProfileToServer, syncSignalsToServer, syncGapToServer } from "@/lib/storage";
 import { CommunicationStyle, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
 import { SelfAwarenessGap, WhatsAppSignals } from "@/lib/types/behavioral";
@@ -64,7 +66,8 @@ function parseCsv(input: string): string[] {
 }
 
 const fieldClass =
-  "w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100";
+  "field mt-2 text-sm";
+const labelClass = "grid gap-1 text-sm font-bold text-white/84";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -73,6 +76,10 @@ export default function OnboardingPage() {
   const [whatsAppApplied, setWhatsAppApplied] = useState(false);
 
   const profilePreview = useMemo(() => `${form.name || "Your name"}, intent: ${form.relationshipIntent}`, [form]);
+
+  useEffect(() => {
+    document.title = "Build your profile · wtfradar";
+  }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -177,37 +184,38 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-white px-6 py-10">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <header className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Clawnection Onboarding</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">Build your romance profile</h1>
-          <p className="max-w-2xl text-sm leading-6 text-zinc-600">
+    <PhoneShell>
+      <main className="screen-padding space-y-6">
+        <header className="space-y-4">
+          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
+          <p className="pill w-fit">Text onboarding</p>
+          <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">Build your dating profile</h1>
+          <p className="text-sm leading-6 text-white/66">
             Your personal agent will represent your priorities during structured virtual dates. You stay in control of every real-world decision.
           </p>
-          <p className="text-xs text-zinc-500">Preview: {profilePreview}</p>
+          <p className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-xs text-white/58">Preview: {profilePreview}</p>
         </header>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <OnboardingSection title="Core profile" description="Essentials used for introductions and baseline matching.">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm text-zinc-700">Name *<input className={fieldClass} value={form.name} onChange={(e) => update("name", e.target.value)} /></label>
-              <label className="text-sm text-zinc-700">Age *<input className={fieldClass} value={form.age} onChange={(e) => update("age", e.target.value)} /></label>
-              <label className="text-sm text-zinc-700">Gender identity<input className={fieldClass} value={form.genderIdentity} onChange={(e) => update("genderIdentity", e.target.value)} /></label>
-              <label className="text-sm text-zinc-700">Looking for
+              <label className={labelClass}>Name *<input className={fieldClass} value={form.name} onChange={(e) => update("name", e.target.value)} required /></label>
+              <label className={labelClass}>Age *<input className={fieldClass} inputMode="numeric" value={form.age} onChange={(e) => update("age", e.target.value)} required /></label>
+              <label className={labelClass}>Gender identity<input className={fieldClass} value={form.genderIdentity} onChange={(e) => update("genderIdentity", e.target.value)} /></label>
+              <label className={labelClass}>Looking for
                 <select className={fieldClass} value={form.lookingFor} onChange={(e) => update("lookingFor", e.target.value as FormState["lookingFor"])}>
                   <option value="Men">Men</option>
                   <option value="Women">Women</option>
                   <option value="Everyone">Everyone</option>
                 </select>
               </label>
-              <label className="text-sm text-zinc-700 sm:col-span-2">Location *<input className={fieldClass} value={form.location} onChange={(e) => update("location", e.target.value)} /></label>
+              <label className={`${labelClass} sm:col-span-2`}>Location *<input className={fieldClass} value={form.location} onChange={(e) => update("location", e.target.value)} required /></label>
             </div>
           </OnboardingSection>
 
           <OnboardingSection title="Connection preferences" description="What you want and how you relate.">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm text-zinc-700">Relationship intent
+              <label className={labelClass}>Relationship intent
                 <select className={fieldClass} value={form.relationshipIntent} onChange={(e) => update("relationshipIntent", e.target.value as RelationshipIntent)}>
                   <option value="long-term">Long-term</option>
                   <option value="serious-dating">Serious dating</option>
@@ -215,7 +223,7 @@ export default function OnboardingPage() {
                   <option value="friendship-first">Friendship first</option>
                 </select>
               </label>
-              <label className="text-sm text-zinc-700">Communication style
+              <label className={labelClass}>Communication style
                 <select className={fieldClass} value={form.communicationStyle} onChange={(e) => update("communicationStyle", e.target.value as CommunicationStyle)}>
                   <option value="balanced">Balanced</option>
                   <option value="direct">Direct</option>
@@ -224,13 +232,13 @@ export default function OnboardingPage() {
                   <option value="reflective">Reflective</option>
                 </select>
               </label>
-              <label className="text-sm text-zinc-700 sm:col-span-2">Short bio *
-                <textarea className={fieldClass} rows={3} value={form.bio} onChange={(e) => update("bio", e.target.value)} />
+              <label className={`${labelClass} sm:col-span-2`}>Short bio *
+                <textarea className={fieldClass} rows={3} value={form.bio} onChange={(e) => update("bio", e.target.value)} required />
               </label>
-              <label className="text-sm text-zinc-700">Interests (comma-separated)
+              <label className={labelClass}>Interests (comma-separated)
                 <input className={fieldClass} value={form.interests} onChange={(e) => update("interests", e.target.value)} />
               </label>
-              <label className="text-sm text-zinc-700">Values (comma-separated)
+              <label className={labelClass}>Values (comma-separated)
                 <input className={fieldClass} value={form.values} onChange={(e) => update("values", e.target.value)} />
               </label>
             </div>
@@ -245,7 +253,7 @@ export default function OnboardingPage() {
                 ["drinking", "Drinking", ["never", "social", "regular"]],
                 ["smoking", "Smoking", ["never", "occasionally", "regular"]],
               ] as const).map(([key, label, options]) => (
-                <label key={key} className="text-sm text-zinc-700">
+                <label key={key} className={labelClass}>
                   {label}
                   <select
                     className={fieldClass}
@@ -258,10 +266,10 @@ export default function OnboardingPage() {
                   </select>
                 </label>
               ))}
-              <label className="text-sm text-zinc-700 sm:col-span-2">Dealbreakers (comma-separated)
+              <label className={`${labelClass} sm:col-span-2`}>Dealbreakers (comma-separated)
                 <input className={fieldClass} value={form.dealbreakers} onChange={(e) => update("dealbreakers", e.target.value)} />
               </label>
-              <label className="text-sm text-zinc-700 sm:col-span-2">Ideal first date
+              <label className={`${labelClass} sm:col-span-2`}>Ideal first date
                 <input className={fieldClass} value={form.idealFirstDate} onChange={(e) => update("idealFirstDate", e.target.value)} />
               </label>
             </div>
@@ -270,7 +278,7 @@ export default function OnboardingPage() {
           <OnboardingSection
             title={
               whatsAppApplied
-                ? "Enrich with your WhatsApp data · Behavioral data applied ✓"
+                ? "Enrich with your WhatsApp data - behavioral data applied"
                 : "Enrich with your WhatsApp data"
             }
             description="Optional. Upload one WhatsApp chat export — your data stays in your browser only."
@@ -284,39 +292,39 @@ export default function OnboardingPage() {
 
           <OnboardingSection title="Match preferences + agent mode" description="Set your counterpart preferences and choose your personal agent path.">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-sm text-zinc-700">Preferred min age
-                <input className={fieldClass} value={form.preferenceMinAge} onChange={(e) => update("preferenceMinAge", e.target.value)} />
+              <label className={labelClass}>Preferred min age
+                <input className={fieldClass} inputMode="numeric" value={form.preferenceMinAge} onChange={(e) => update("preferenceMinAge", e.target.value)} />
               </label>
-              <label className="text-sm text-zinc-700">Preferred max age
-                <input className={fieldClass} value={form.preferenceMaxAge} onChange={(e) => update("preferenceMaxAge", e.target.value)} />
+              <label className={labelClass}>Preferred max age
+                <input className={fieldClass} inputMode="numeric" value={form.preferenceMaxAge} onChange={(e) => update("preferenceMaxAge", e.target.value)} />
               </label>
-              <label className="text-sm text-zinc-700 sm:col-span-2">Preference notes
+              <label className={`${labelClass} sm:col-span-2`}>Preference notes
                 <textarea className={fieldClass} rows={2} value={form.preferenceNotes} onChange={(e) => update("preferenceNotes", e.target.value)} />
               </label>
-              <fieldset className="sm:col-span-2 rounded-xl border border-zinc-200 p-3">
-                <legend className="px-2 text-sm font-medium text-zinc-800">Agent type</legend>
+              <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-3">
+                <legend className="px-2 text-sm font-bold text-white">Agent type</legend>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="rounded-lg border border-zinc-200 p-3 text-sm text-zinc-700">
-                    <input type="radio" checked={form.agentType === "hosted"} onChange={() => update("agentType", "hosted")} /> Hosted Clawnection agent
+                  <label className="flex gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
+                    <input type="radio" name="agentType" checked={form.agentType === "hosted"} onChange={() => update("agentType", "hosted")} /> Hosted wtfradar agent
                   </label>
-                  <label className="rounded-lg border border-zinc-200 p-3 text-sm text-zinc-700">
-                    <input type="radio" checked={form.agentType === "external-mock"} onChange={() => update("agentType", "external-mock")} /> External/mock (BYO agent path)
+                  <label className="flex gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
+                    <input type="radio" name="agentType" checked={form.agentType === "external-mock"} onChange={() => update("agentType", "external-mock")} /> External agent demo path
                   </label>
                 </div>
               </fieldset>
             </div>
           </OnboardingSection>
 
-          {error ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
+          {error ? <p role="alert" className="rounded-2xl border border-red-300/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">{error}</p> : null}
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700"
+            className="primary-button w-full"
           >
-            Save Profile & Continue to Demo
+            Save profile and run a virtual date
           </button>
         </form>
-      </div>
-    </main>
+      </main>
+    </PhoneShell>
   );
 }

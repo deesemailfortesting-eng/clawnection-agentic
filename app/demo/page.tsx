@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { PhoneShell } from "@/components/PhoneShell";
 import { ProfileCard } from "@/components/ProfileCard";
 import { sampleProfiles } from "@/lib/data/sampleProfiles";
 import { runVirtualDateSimulation } from "@/lib/matching/virtualDate";
@@ -15,6 +17,10 @@ export default function DemoPage() {
     return loadProfile();
   });
   const [selectedId, setSelectedId] = useState(sampleProfiles[0].id);
+
+  useEffect(() => {
+    document.title = "Run a virtual date · wtfradar";
+  }, []);
 
   useEffect(() => {
     if (!profile) {
@@ -36,26 +42,28 @@ export default function DemoPage() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-6 py-10">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <header className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Demo Match</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">Run a virtual date simulation</h1>
-          <p className="text-sm text-zinc-600">Choose a counterpart profile, then let both personal agents run the six-round protocol.</p>
+    <PhoneShell>
+      <main className="screen-padding space-y-6">
+        <header className="space-y-4">
+          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
+          <p className="pill w-fit">Agent match demo</p>
+          <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">Run a virtual date</h1>
+          <p className="text-sm leading-6 text-white/66">Choose a counterpart profile. Both personal agents then run a six-round conversation and explain the outcome.</p>
         </header>
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <section aria-labelledby="profiles-title" className="space-y-4">
+          <h2 id="profiles-title" className="sr-only">Profiles for the virtual date</h2>
           {profile ? <ProfileCard profile={profile} title="Your Profile" subtitle="Loaded from localStorage" /> : null}
-          <div className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <label className="text-sm font-medium text-zinc-800">
+          <div className="obsidian-card space-y-4 rounded-[28px] p-5">
+            <label className="grid gap-2 text-sm font-bold text-white/84">
               Choose counterpart
               <select
-                className="mt-2 w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                className="field text-sm"
                 value={selectedId}
                 onChange={(event) => setSelectedId(event.target.value)}
               >
                 {sampleProfiles.map((option) => (
-                  <option key={option.id} value={option.id}>{option.name} · {option.agentType === "hosted" ? "Hosted" : "External/Mock"}</option>
+                  <option key={option.id} value={option.id}>{option.name} - {option.agentType === "hosted" ? "Hosted" : "External demo"}</option>
                 ))}
               </select>
             </label>
@@ -63,13 +71,13 @@ export default function DemoPage() {
             <button
               onClick={runSimulation}
               disabled={!profile}
-              className="w-full rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400"
+              className="primary-button w-full"
             >
-              Run Virtual Date
+              Run virtual date
             </button>
           </div>
-        </div>
-      </div>
-    </main>
+        </section>
+      </main>
+    </PhoneShell>
   );
 }

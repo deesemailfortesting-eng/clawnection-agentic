@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
+import { PhoneShell } from "@/components/PhoneShell";
 import { saveProfile, syncProfileToServer } from "@/lib/storage";
 import { CommunicationStyle, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
 
@@ -30,13 +32,27 @@ type ProfileData = {
   agentType?: RomanticProfile["agentType"];
 };
 
+const fieldClass = "field mt-2 text-sm";
+const labelClass = "grid gap-1 text-sm font-bold text-white/84";
+const vapiApiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
+const vapiAssistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
+
+function messageText(message: unknown): string {
+  if (typeof message !== "object" || message === null || !("text" in message)) return "";
+  const text = (message as { text?: unknown }).text;
+  return typeof text === "string" ? text : "";
+}
+
 export default function VoiceOnboardingPage() {
   const router = useRouter();
   const vapiRef = useRef<Vapi | null>(null);
+  const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isCallActive, setIsCallActive] = useState(false);
   const [profile, setProfile] = useState<ProfileData>({});
   const [isComplete, setIsComplete] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    vapiApiKey ? null : "Voice onboarding is not configured. NEXT_PUBLIC_VAPI_API_KEY is missing.",
+  );
   const [preCallData, setPreCallData] = useState({
     name: "",
     gender: "",
@@ -51,46 +67,7 @@ export default function VoiceOnboardingPage() {
     profileRef.current = profile;
   }, [profile]);
 
-  useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
-    if (!apiKey) {
-      setError("Voice onboarding is not configured. NEXT_PUBLIC_VAPI_API_KEY is missing.");
-      return;
-    }
-
-    vapiRef.current = new Vapi(apiKey);
-    const vapi = vapiRef.current;
-
-    vapi.on("call-start", () => setIsCallActive(true));
-
-    vapi.on("call-end", () => {
-      setIsCallActive(false);
-      processAndSaveProfile(profileRef.current);
-    });
-
-    vapi.on("message", (message: any) => {
-      const text = message.text || "";
-      const jsonMatch = text.match(/PROFILE_DATA:\s*(\{.*\})/);
-      if (jsonMatch) {
-        try {
-          const data = JSON.parse(jsonMatch[1]);
-          setProfile(data);
-          profileRef.current = data;
-        } catch {
-          // malformed JSON from assistant — ignore
-        }
-      }
-    });
-
-    vapi.on("error", (err: any) => {
-      console.error("Vapi error:", err);
-      setIsCallActive(false);
-    });
-
-    return () => { vapi.stop(); };
-  }, []);
-
-  function processAndSaveProfile(data: ProfileData) {
+  const processAndSaveProfile = useCallback((data: ProfileData) => {
     if (!data.name || !data.age || !data.location || !data.bio) return;
 
     const romanticProfile: RomanticProfile = {
@@ -127,11 +104,55 @@ export default function VoiceOnboardingPage() {
     syncProfileToServer(romanticProfile);
     setIsComplete(true);
     setTimeout(() => router.push("/demo"), 2000);
-  }
+  }, [router]);
+
+  useEffect(() => {
+    document.title = "Voice onboarding · wtfradar";
+    if (!vapiApiKey) return;
+
+    vapiRef.current = new Vapi(vapiApiKey);
+    const vapi = vapiRef.current;
+
+    vapi.on("call-start", () => setIsCallActive(true));
+
+    vapi.on("call-end", () => {
+      setIsCallActive(false);
+      if (callTimeoutRef.current) {
+        clearTimeout(callTimeoutRef.current);
+        callTimeoutRef.current = null;
+      }
+      processAndSaveProfile(profileRef.current);
+    });
+
+    vapi.on("message", (message: unknown) => {
+      const text = messageText(message);
+      const jsonMatch = text.match(/PROFILE_DATA:\s*(\{.*\})/);
+      if (jsonMatch) {
+        try {
+          const data = JSON.parse(jsonMatch[1]);
+          setProfile(data);
+          profileRef.current = data;
+        } catch {
+          // Ignore malformed assistant JSON; the call can continue safely.
+        }
+      }
+    });
+
+    vapi.on("error", (err: unknown) => {
+      console.error("Vapi error:", err);
+      setIsCallActive(false);
+      setError("The voice call stopped unexpectedly. You can try again or use text onboarding.");
+    });
+
+    return () => {
+      if (callTimeoutRef.current) clearTimeout(callTimeoutRef.current);
+      vapi.stop();
+    };
+  }, [processAndSaveProfile]);
 
   async function startVoiceOnboarding() {
     if (!vapiRef.current) {
-      setError("Vapi not initialized — check NEXT_PUBLIC_VAPI_API_KEY.");
+      setError("Voice onboarding is not initialized. Check NEXT_PUBLIC_VAPI_API_KEY.");
       return;
     }
     if (!preCallData.name || !preCallData.gender || !preCallData.sexualPreference) {
@@ -139,69 +160,95 @@ export default function VoiceOnboardingPage() {
       return;
     }
 
-    const assistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
-    if (!assistantId) {
+    if (!vapiAssistantId) {
       setError("Voice onboarding is not configured. NEXT_PUBLIC_VAPI_ASSISTANT_ID is missing.");
       return;
     }
 
     setError(null);
 
-    // Auto-terminate after 30 minutes
-    setTimeout(() => { vapiRef.current?.stop(); }, 30 * 60 * 1000);
+    // Auto-terminate after 30 minutes so microphone access cannot remain open indefinitely.
+    callTimeoutRef.current = setTimeout(() => { vapiRef.current?.stop(); }, 30 * 60 * 1000);
 
     try {
-      const firstMessage = `Hey ${preCallData.name} — Clawnection here. I can see from what you shared that you identify as ${preCallData.gender} and your sexual preference is ${preCallData.sexualPreference}. Before we get going, just so you know what this is: we're gonna talk for however long feels right. After this, I spin up a version of you that goes and chats with other people's agents — and when yours genuinely clicks with someone, we set up a real meet. So this is just… you and me, for a bit. No form, no right answers. Where are you right now — like, physically, what room are you in?`;
-      await vapiRef.current.start(assistantId, { firstMessage });
+      const firstMessage = `Hey ${preCallData.name}. This is wtfradar. You shared that you identify as ${preCallData.gender} and your dating preference is ${preCallData.sexualPreference}. We will have a guided conversation to build your dating profile. After this, your agent can chat with other agents in a virtual date before you decide whether to meet someone. There are no right answers. To begin, where are you right now, like what room are you in?`;
+      await vapiRef.current.start(vapiAssistantId, { firstMessage });
       setShowPreCallForm(false);
-    } catch (err) {
+    } catch {
+      if (callTimeoutRef.current) {
+        clearTimeout(callTimeoutRef.current);
+        callTimeoutRef.current = null;
+      }
       setError("Failed to start the call. Check your Vapi credentials.");
     }
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 via-white to-white px-6 py-10">
-      <div className="mx-auto max-w-2xl space-y-6">
-        <header className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-500">Voice Onboarding</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">Build your romance profile with voice</h1>
-          <p className="text-sm leading-6 text-zinc-600">
-            Chat with our AI assistant to create your profile. Just speak naturally — we'll guide you through everything.
+    <PhoneShell>
+      <main className="screen-padding space-y-6">
+        <header className="space-y-4">
+          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
+          <p className="pill w-fit">Voice onboarding</p>
+          <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">Build your profile by voice</h1>
+          <p className="text-sm leading-6 text-white/66">
+            Talk with the wtfradar assistant to create your dating profile. Every spoken instruction is also summarized on this screen.
           </p>
         </header>
 
         {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div role="alert" className="rounded-2xl border border-red-300/40 bg-red-500/12 px-4 py-3 text-sm text-red-100">
             {error}
           </div>
         )}
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-6">
+        <section aria-labelledby="voice-status-title" className="obsidian-card rounded-[30px] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 id="voice-status-title" className="text-xl font-black text-white">Microphone status</h2>
+              <p className="mt-1 text-sm leading-6 text-white/62">
+                {isCallActive ? "Your microphone is active for the onboarding call." : "Your microphone is off."}
+              </p>
+            </div>
+            <div
+              aria-hidden="true"
+              className={`mt-1 h-5 w-5 rounded-full ${isCallActive ? "animate-pulse bg-emerald-400 shadow-[0_0_26px_rgba(52,211,153,0.8)]" : "bg-white/18"}`}
+            />
+          </div>
+          <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-white">
+            {isCallActive ? "Microphone active. The assistant can hear you now." : "Microphone inactive. Start the call when you are ready."}
+          </p>
+        </section>
+
+        <section aria-labelledby="voice-flow-title" className="obsidian-card rounded-[30px] p-5">
           {showPreCallForm && !isCallActive && !isComplete && (
             <div className="space-y-6">
-              <div className="text-center">
-                <h2 className="text-lg font-semibold text-zinc-900 mb-2">Before we start chatting…</h2>
-                <p className="text-sm text-zinc-600">This helps our AI assistant have a more personalised conversation.</p>
+              <div className="space-y-2">
+                <h2 id="voice-flow-title" className="text-xl font-black text-white">Before the call</h2>
+                <p className="text-sm leading-6 text-white/64">
+                  These details help the assistant start respectfully. You can end the call at any time.
+                </p>
               </div>
 
               <div className="space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium text-zinc-700">What's your name?</span>
+                <label className={labelClass}>
+                  What is your name?
                   <input
                     type="text"
-                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    className={fieldClass}
                     value={preCallData.name}
                     onChange={(e) => setPreCallData((p) => ({ ...p, name: e.target.value }))}
                     placeholder="Enter your name"
+                    required
                   />
                 </label>
 
-                <label className="block">
-                  <span className="text-sm font-medium text-zinc-700">What's your gender?</span>
+                <label className={labelClass}>
+                  What is your gender?
                   <select
-                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    className={fieldClass}
                     value={preCallData.gender}
                     onChange={(e) => setPreCallData((p) => ({ ...p, gender: e.target.value }))}
+                    required
                   >
                     <option value="">Select your gender</option>
                     <option value="woman">Woman</option>
@@ -212,12 +259,13 @@ export default function VoiceOnboardingPage() {
                   </select>
                 </label>
 
-                <label className="block">
-                  <span className="text-sm font-medium text-zinc-700">What's your sexual preference?</span>
+                <label className={labelClass}>
+                  What is your dating preference?
                   <select
-                    className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                    className={fieldClass}
                     value={preCallData.sexualPreference}
                     onChange={(e) => setPreCallData((p) => ({ ...p, sexualPreference: e.target.value }))}
+                    required
                   >
                     <option value="">Select your preference</option>
                     <option value="straight">Straight</option>
@@ -234,55 +282,60 @@ export default function VoiceOnboardingPage() {
               </div>
 
               <button
+                type="button"
                 onClick={startVoiceOnboarding}
                 disabled={!preCallData.name || !preCallData.gender || !preCallData.sexualPreference}
-                className="w-full rounded-xl bg-rose-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                className="primary-button w-full"
               >
-                Start Voice Chat
+                Start voice onboarding
               </button>
 
-              <p className="text-center text-xs text-zinc-500">
+              <p className="text-center text-xs leading-5 text-white/50">
                 Automatically ends after 30 minutes. You can end early at any time.
               </p>
             </div>
           )}
 
           {isCallActive && (
-            <div className="space-y-4 text-center">
-              <div className="inline-flex items-center gap-2">
-                <div className="h-3 w-3 animate-pulse rounded-full bg-green-500" />
-                <p className="text-sm font-medium text-zinc-900">Call in progress</p>
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <h2 id="voice-flow-title" className="text-xl font-black text-white">Call in progress</h2>
+                <p className="text-sm leading-6 text-white/66">
+                  Speak naturally. The assistant will ask about your location, values, interests, communication style, boundaries, and first-date preferences.
+                </p>
               </div>
-              <p className="text-sm text-zinc-600">
-                Speak naturally. We'll collect your profile information through conversation.
-              </p>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+                <h3 className="text-sm font-black text-white">Visual equivalent of the audio prompt</h3>
+                <p className="mt-2 text-sm leading-6 text-white/62">
+                  The assistant is guiding you through profile questions. If you miss a spoken prompt, ask it to repeat or summarize the question.
+                </p>
+              </div>
               <button
+                type="button"
                 onClick={() => vapiRef.current?.stop()}
-                className="rounded-xl bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-300"
+                className="secondary-button w-full"
+                aria-label="End voice onboarding call and turn off the microphone"
               >
-                End Call
+                End call and turn off microphone
               </button>
             </div>
           )}
 
           {isComplete && (
-            <div className="space-y-2 text-center">
-              <div className="inline-flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-green-500" />
-                <p className="text-sm font-medium text-zinc-900">Profile created and saved!</p>
-              </div>
-              <p className="text-sm text-zinc-600">Redirecting to the demo…</p>
+            <div className="space-y-3 text-center">
+              <h2 id="voice-flow-title" className="text-xl font-black text-white">Profile saved</h2>
+              <p className="text-sm leading-6 text-white/66">Your profile is ready. Redirecting to the virtual date demo.</p>
             </div>
           )}
-        </div>
+        </section>
 
-        <p className="text-center text-xs text-zinc-500">
+        <p className="text-center text-xs text-white/52">
           Prefer to fill out the form manually?{" "}
-          <a href="/onboarding" className="text-rose-500 hover:text-rose-600">
-            Go to text onboarding
-          </a>
+          <Link href="/onboarding" className="font-bold text-white underline underline-offset-4">
+            Open text onboarding
+          </Link>
         </p>
-      </div>
-    </main>
+      </main>
+    </PhoneShell>
   );
 }

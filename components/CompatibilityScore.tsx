@@ -3,18 +3,29 @@ type CompatibilityScoreProps = {
 };
 
 export function CompatibilityScore({ score }: CompatibilityScoreProps) {
-  const hue = score >= 75 ? "bg-emerald-500" : score >= 55 ? "bg-amber-500" : "bg-rose-500";
+  const hue = score >= 75 ? "bg-emerald-400" : score >= 55 ? "bg-amber-400" : "bg-[#ff4458]";
+  const summary =
+    score >= 75
+      ? "Strong match signal"
+      : score >= 55
+        ? "Mixed match signal"
+        : "Low match signal";
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Compatibility Score</p>
+    <section aria-labelledby="compatibility-score-title" className="obsidian-card rounded-[28px] p-5">
+      <p id="compatibility-score-title" className="text-xs font-black uppercase tracking-[0.18em] text-white/44">Compatibility score</p>
       <div className="mt-2 flex items-end gap-3">
-        <p className="text-4xl font-semibold text-zinc-900">{score}</p>
-        <p className="pb-1 text-sm text-zinc-500">/ 100</p>
+        <p className="text-5xl font-black tracking-tight text-white">{score}</p>
+        <p className="pb-2 text-sm text-white/50">out of 100</p>
       </div>
-      <div className="mt-4 h-2.5 w-full rounded-full bg-zinc-100">
+      <p className="mt-2 text-sm font-bold text-white/74">{summary}</p>
+      <div
+        className="mt-4 h-3 w-full overflow-hidden rounded-full bg-white/10"
+        role="img"
+        aria-label={`Compatibility score is ${score} out of 100. ${summary}.`}
+      >
         <div className={`h-full rounded-full ${hue}`} style={{ width: `${score}%` }} />
       </div>
-    </div>
+    </section>
   );
 }
