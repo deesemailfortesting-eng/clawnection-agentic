@@ -6,7 +6,7 @@ import Link from "next/link";
 import { OnboardingSection } from "@/components/OnboardingSection";
 import { PhoneShell } from "@/components/PhoneShell";
 import { saveProfile, saveSignals, saveGap, syncProfileToServer, syncSignalsToServer, syncGapToServer } from "@/lib/storage";
-import { CommunicationStyle, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
+import { CommunicationStyle, InterestProfile, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
 import { SelfAwarenessGap, WhatsAppSignals } from "@/lib/types/behavioral";
 import { WhatsAppUpload } from "@/components/WhatsAppUpload";
 
@@ -18,7 +18,10 @@ type FormState = {
   location: string;
   relationshipIntent: RelationshipIntent;
   bio: string;
-  interests: string;
+  interests: string[];
+  passions: string[];
+  affinityTags: string[];
+  customInterests: string;
   values: string;
   communicationStyle: CommunicationStyle;
   sleepSchedule: RomanticProfile["lifestyleHabits"]["sleepSchedule"];
@@ -48,6 +51,43 @@ const partnerPriorityOptions = [
   "curious",
 ] as const;
 
+const interestOptions = [
+  "music",
+  "food",
+  "travel",
+  "fitness",
+  "arts",
+  "outdoors",
+  "tech",
+  "reading",
+  "sports",
+  "wellness",
+] as const;
+
+const passionOptions = [
+  "live music",
+  "coffee",
+  "museums",
+  "cooking",
+  "photography",
+  "pilates",
+  "hiking",
+  "design",
+  "board games",
+  "astrology",
+] as const;
+
+const affinityTagOptions = [
+  "dog person",
+  "planner",
+  "spontaneous streak",
+  "homebody",
+  "night owl energy",
+  "zodiac lover",
+  "frequent flyer",
+  "foodie",
+] as const;
+
 const dealbreakerOptions = [
   "smoking",
   "dishonesty",
@@ -67,7 +107,10 @@ const defaultForm: FormState = {
   location: "",
   relationshipIntent: "long-term",
   bio: "",
-  interests: "",
+  interests: [],
+  passions: [],
+  affinityTags: [],
+  customInterests: "",
   values: "",
   communicationStyle: "balanced",
   sleepSchedule: "flexible",
@@ -118,6 +161,23 @@ function buildDealbreakerList(form: FormState): string[] {
   return dedupeValues([...form.dealbreakers, ...parseCsv(form.customDealbreakers)]);
 }
 
+function buildInterestProfile(form: FormState): InterestProfile {
+  return {
+    core: form.interests,
+    passions: dedupeValues([...form.passions, ...parseCsv(form.customInterests)]),
+    tags: form.affinityTags,
+  };
+}
+
+function buildInterestList(form: FormState): string[] {
+  const interestProfile = buildInterestProfile(form);
+  return dedupeValues([
+    ...interestProfile.core,
+    ...interestProfile.passions,
+    ...interestProfile.tags,
+  ]);
+}
+
 function buildPreferenceNotes(form: FormState): string {
   const notes: string[] = [];
 
@@ -166,7 +226,8 @@ export default function OnboardingPage() {
       location: form.location,
       relationshipIntent: form.relationshipIntent,
       bio: form.bio,
-      interests: parseCsv(form.interests),
+      interests: buildInterestList(form),
+      interestProfile: buildInterestProfile(form),
       values: parseCsv(form.values),
       communicationStyle: form.communicationStyle,
       lifestyleHabits: {
@@ -233,7 +294,8 @@ export default function OnboardingPage() {
       location: form.location,
       relationshipIntent: form.relationshipIntent,
       bio: form.bio,
-      interests: parseCsv(form.interests),
+      interests: buildInterestList(form),
+      interestProfile: buildInterestProfile(form),
       values: parseCsv(form.values),
       communicationStyle: form.communicationStyle,
       lifestyleHabits: {
@@ -307,9 +369,77 @@ export default function OnboardingPage() {
               <label className={`${labelClass} sm:col-span-2`}>Short bio *
                 <textarea className={fieldClass} rows={3} value={form.bio} onChange={(e) => update("bio", e.target.value)} required />
               </label>
-              <label className={labelClass}>Interests (comma-separated)
-                <input className={fieldClass} value={form.interests} onChange={(e) => update("interests", e.target.value)} />
-              </label>
+              <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-4">
+                <legend className="px-2 text-sm font-bold text-white">Interests and passions</legend>
+                <p className="px-2 text-xs leading-5 text-white/58">
+                  Choose broad interests, then add the specific passions and vibe tags that make your profile feel like you.
+                </p>
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/46">Core interests</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {interestOptions.map((option) => {
+                        const selected = form.interests.includes(option);
+                        return (
+                          <button
+                            key={option}
+                            type="button"
+                            className={`${chipClass} ${selected ? "border-fuchsia-300/70 bg-fuchsia-400/18 text-white" : "border-white/12 bg-white/[0.04] text-white/72"}`}
+                            onClick={() => update("interests", toggleSelection(form.interests, option))}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/46">Passions</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {passionOptions.map((option) => {
+                        const selected = form.passions.includes(option);
+                        return (
+                          <button
+                            key={option}
+                            type="button"
+                            className={`${chipClass} ${selected ? "border-amber-300/70 bg-amber-400/18 text-white" : "border-white/12 bg-white/[0.04] text-white/72"}`}
+                            onClick={() => update("passions", toggleSelection(form.passions, option))}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/46">Affinity tags</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {affinityTagOptions.map((option) => {
+                        const selected = form.affinityTags.includes(option);
+                        return (
+                          <button
+                            key={option}
+                            type="button"
+                            className={`${chipClass} ${selected ? "border-sky-300/70 bg-sky-400/18 text-white" : "border-white/12 bg-white/[0.04] text-white/72"}`}
+                            onClick={() => update("affinityTags", toggleSelection(form.affinityTags, option))}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <label className={`${labelClass} mt-4`}>
+                  Add a few custom interests or passions
+                  <input
+                    className={fieldClass}
+                    value={form.customInterests}
+                    onChange={(e) => update("customInterests", e.target.value)}
+                    placeholder="e.g. ceramics, sci-fi novels, karaoke"
+                  />
+                </label>
+              </fieldset>
               <label className={labelClass}>Values (comma-separated)
                 <input className={fieldClass} value={form.values} onChange={(e) => update("values", e.target.value)} />
               </label>
