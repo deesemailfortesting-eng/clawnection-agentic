@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
 import { PhoneShell } from "@/components/PhoneShell";
+import { VoiceOrb } from "@/components/VoiceOrb";
 import { saveProfile, syncProfileToServer } from "@/lib/storage";
 import {
   CommunicationStyle,
@@ -748,22 +749,12 @@ export default function VoiceOnboardingPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={isCallActive ? endVoiceCall : startVoiceCall}
+            <VoiceOrb
+              active={isCallActive}
               disabled={isComplete}
-              className="voice-orb"
-              data-active={isCallActive}
-              aria-label={isCallActive ? "End voice call" : "Start voice call"}
-            >
-              <span className="voice-orb-ring" aria-hidden="true" />
-              <span className="voice-orb-ring" aria-hidden="true" />
-              <span className="voice-orb-ring" aria-hidden="true" />
-              <span className="voice-orb-core" aria-hidden="true" />
-              <span className="sr-only">
-                {isCallActive ? "Voice call active. Tap to end." : "Tap to start voice call."}
-              </span>
-            </button>
+              onClick={isCallActive ? endVoiceCall : startVoiceCall}
+              ariaLabel={isCallActive ? "End voice call" : "Start voice call"}
+            />
 
             <div className="w-full space-y-3">
               <p
