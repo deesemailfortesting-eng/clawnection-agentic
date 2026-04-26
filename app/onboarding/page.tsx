@@ -117,6 +117,7 @@ export default function OnboardingPage() {
     updatedProfile: RomanticProfile,
     signals: WhatsAppSignals,
     gap: SelfAwarenessGap,
+    fileCount: number,
   ) {
     update("communicationStyle", updatedProfile.communicationStyle);
     update("sleepSchedule", updatedProfile.lifestyleHabits.sleepSchedule);
@@ -124,7 +125,7 @@ export default function OnboardingPage() {
     saveGap(gap);
     // Sync to D1 — profileId may not be final yet, use a temp key derived from current name
     const tempId = `local-${updatedProfile.name.toLowerCase().replace(/\s+/g, "-")}`;
-    syncSignalsToServer(tempId, signals, signals.userMessageCount);
+    syncSignalsToServer(tempId, signals, fileCount);
     syncGapToServer(tempId, gap);
     setWhatsAppApplied(true);
   }
@@ -180,7 +181,7 @@ export default function OnboardingPage() {
 
     saveProfile(profile);
     syncProfileToServer(profile);
-    router.push("/demo");
+    router.push(`/demo?profileId=${encodeURIComponent(profile.id)}`);
   }
 
   return (

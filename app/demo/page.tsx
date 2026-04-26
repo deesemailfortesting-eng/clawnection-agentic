@@ -7,15 +7,17 @@ import { PhoneShell } from "@/components/PhoneShell";
 import { ProfileCard } from "@/components/ProfileCard";
 import { sampleProfiles } from "@/lib/data/sampleProfiles";
 import { runVirtualDateSimulation } from "@/lib/matching/virtualDate";
-import { loadProfile, saveResult, syncResultToServer } from "@/lib/storage";
+import { loadProfile, loadProfileFromServer, loadSignalsFromServer, saveResult, syncResultToServer } from "@/lib/storage";
 import { RomanticProfile } from "@/lib/types/matching";
 
 export default function DemoPage() {
   const router = useRouter();
-  const [profile] = useState<RomanticProfile | null>(() => {
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<RomanticProfile | null>(() => {
     if (typeof window === "undefined") return null;
     return loadProfile();
   });
+  const [isRestoring, setIsRestoring] = useState(true);
   const [selectedId, setSelectedId] = useState(sampleProfiles[0].id);
 
   useEffect(() => {
@@ -23,22 +25,70 @@ export default function DemoPage() {
   }, []);
 
   useEffect(() => {
-    if (!profile) {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setProfileId(params.get("profileId"));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreSavedState() {
+      const cachedProfile = typeof window === "undefined" ? null : loadProfile();
+      const requestedProfileId = profileId ?? cachedProfile?.id ?? null;
+
+      if (cachedProfile) {
+        setProfile(cachedProfile);
+      }
+
+      if (!requestedProfileId) {
+        if (!cancelled) {
+          setIsRestoring(false);
+          router.replace("/onboarding");
+        }
+        return;
+      }
+
+      const [serverProfile] = await Promise.all([
+        loadProfileFromServer(requestedProfileId),
+        loadSignalsFromServer(requestedProfileId),
+      ]);
+
+      if (cancelled) return;
+
+      if (serverProfile) {
+        setProfile(serverProfile);
+        setIsRestoring(false);
+        return;
+      }
+
+      if (cachedProfile) {
+        setIsRestoring(false);
+        return;
+      }
+
+      setIsRestoring(false);
       router.replace("/onboarding");
     }
-  }, [profile, router]);
+
+    void restoreSavedState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, router]);
 
   const counterpart = useMemo(
     () => sampleProfiles.find((candidate) => candidate.id === selectedId) ?? sampleProfiles[0],
     [selectedId],
   );
 
-  function runSimulation() {
+  async function runSimulation() {
     if (!profile) return;
     const result = runVirtualDateSimulation(profile, counterpart);
     saveResult(result);
-    syncResultToServer(result);
-    router.push("/results");
+    const resultId = await syncResultToServer(result);
+    router.push(resultId ? `/results?resultId=${encodeURIComponent(resultId)}` : "/results");
   }
 
   return (
@@ -53,7 +103,7 @@ export default function DemoPage() {
 
         <section aria-labelledby="profiles-title" className="space-y-4">
           <h2 id="profiles-title" className="sr-only">Profiles for the virtual date</h2>
-          {profile ? <ProfileCard profile={profile} title="Your Profile" subtitle="Loaded from localStorage" /> : null}
+          {profile ? <ProfileCard profile={profile} title="Your Profile" subtitle="Loaded from saved state" /> : null}
           <div className="obsidian-card space-y-4 rounded-[28px] p-5">
             <label className="grid gap-2 text-sm font-bold text-white/84">
               Choose counterpart
@@ -70,10 +120,10 @@ export default function DemoPage() {
             <ProfileCard profile={counterpart} title="Counterpart" compact />
             <button
               onClick={runSimulation}
-              disabled={!profile}
+              disabled={!profile || isRestoring}
               className="primary-button w-full"
             >
-              Run virtual date
+              {isRestoring ? "Restoring saved state..." : "Run virtual date"}
             </button>
           </div>
         </section>

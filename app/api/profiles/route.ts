@@ -11,13 +11,32 @@ export async function POST(req: NextRequest) {
 
   await db
     .prepare(
-      `INSERT OR REPLACE INTO profiles (
+      `INSERT INTO profiles (
         id, name, age, gender_identity, looking_for, location,
         relationship_intent, bio, interests, profile_values,
         communication_style, lifestyle_habits, dealbreakers,
         ideal_first_date, preference_age_min, preference_age_max,
         preference_notes, agent_type, updated_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))`,
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        age = excluded.age,
+        gender_identity = excluded.gender_identity,
+        looking_for = excluded.looking_for,
+        location = excluded.location,
+        relationship_intent = excluded.relationship_intent,
+        bio = excluded.bio,
+        interests = excluded.interests,
+        profile_values = excluded.profile_values,
+        communication_style = excluded.communication_style,
+        lifestyle_habits = excluded.lifestyle_habits,
+        dealbreakers = excluded.dealbreakers,
+        ideal_first_date = excluded.ideal_first_date,
+        preference_age_min = excluded.preference_age_min,
+        preference_age_max = excluded.preference_age_max,
+        preference_notes = excluded.preference_notes,
+        agent_type = excluded.agent_type,
+        updated_at = datetime('now')`,
     )
     .bind(
       profile.id,
