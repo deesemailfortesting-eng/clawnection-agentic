@@ -487,9 +487,6 @@ export default function VoiceOnboardingPage() {
                 wtfradar
               </Link>
             )}
-            <span className="pill">
-              Step {stepIndex + 1} of {STEP_ORDER.length}
-            </span>
           </div>
 
           <div className="step-progress" aria-hidden="true">
@@ -511,7 +508,6 @@ export default function VoiceOnboardingPage() {
         {step === "welcome" && (
           <section className="flex flex-1 flex-col justify-between gap-8">
             <div className="space-y-5">
-              <p className="pill w-fit">Welcome</p>
               <h1 className="text-5xl font-black leading-[0.95] tracking-[-0.05em] text-white">
                 Let&apos;s build your<br />wtf<span className="radar-text-gradient">radar</span> profile.
               </h1>
@@ -533,7 +529,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "name" && (
           <StepLayout
-            pill="A bit about you"
             title="What's your name?"
             description="Last names stay private until you and a match both agree to share."
             onContinue={goNext}
@@ -571,7 +566,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "dob" && (
           <StepLayout
-            pill="A bit about you"
             title="When's your birthday?"
             description="You must be 18 or older to use wtfradar. We only show your age, not your full birthday."
             onContinue={goNext}
@@ -631,7 +625,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "phone" && (
           <StepLayout
-            pill="Account"
             title="What's your phone number?"
             description="We use it for verification and account recovery — never shared with matches."
             onContinue={goNext}
@@ -653,7 +646,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "location" && (
           <StepLayout
-            pill="Where you are"
             title="Where do you live?"
             description="City and state, or city and country. We use it to find nearby matches."
             onContinue={goNext}
@@ -673,7 +665,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "occupationType" && (
           <StepLayout
-            pill="What you're up to"
             title="What's your day job?"
             onContinue={goNext}
             continueDisabled={continueDisabled}
@@ -699,7 +690,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "occupationPlace" && (
           <StepLayout
-            pill="What you're up to"
             title={
               occupationType === "school" ? "Where do you study?" : "Where do you work?"
             }
@@ -725,7 +715,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "gender" && (
           <StepLayout
-            pill="About you"
             title="I am a..."
             description="Pick the option that fits best — you can be more specific in the voice chat."
             onContinue={goNext}
@@ -749,7 +738,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "preference" && (
           <StepLayout
-            pill="Who you're looking for"
             title="I'm attracted to..."
             description="This helps your agent line up the right virtual dates."
             onContinue={goNext}
@@ -773,7 +761,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "intent" && (
           <StepLayout
-            pill="What you want"
             title="What kind of relationship?"
             description="Be honest — your agent will only match you with people who want similar things."
             onContinue={goNext}
@@ -800,7 +787,6 @@ export default function VoiceOnboardingPage() {
 
         {step === "socials" && (
           <StepLayout
-            pill="Optional"
             title="Add your socials?"
             description="Totally optional — you can add or remove these any time. Only shared after you both opt in."
             onContinue={goNext}
@@ -837,9 +823,6 @@ export default function VoiceOnboardingPage() {
         {step === "voice" && (
           <section className="flex flex-1 flex-col items-center justify-between gap-10 text-center">
             <div className="space-y-3">
-              <p className="pill mx-auto w-fit">
-                {isComplete ? "All set" : isCallActive ? "Listening" : "Voice chat"}
-              </p>
               <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">
                 {isComplete
                   ? "Profile saved."
@@ -904,7 +887,6 @@ export default function VoiceOnboardingPage() {
 }
 
 function StepLayout({
-  pill,
   title,
   description,
   children,
@@ -913,7 +895,6 @@ function StepLayout({
   continueLabel = "Continue",
   error,
 }: {
-  pill: string;
   title: string;
   description?: string;
   children: React.ReactNode;
@@ -925,7 +906,6 @@ function StepLayout({
   return (
     <section className="flex flex-1 flex-col justify-between gap-8">
       <div className="space-y-5">
-        <p className="pill w-fit">{pill}</p>
         <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">{title}</h1>
         {description ? <p className="text-sm leading-6 text-white/62">{description}</p> : null}
         <div className="space-y-3">{children}</div>
