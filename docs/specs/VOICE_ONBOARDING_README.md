@@ -12,6 +12,7 @@ This page integrates Vapi for voice-based user onboarding in the Clawnection app
 ## Setup Instructions
 
 1. **Install Vapi SDK** (already done):
+
    ```bash
    npm install @vapi-ai/web
    ```
@@ -25,13 +26,22 @@ This page integrates Vapi for voice-based user onboarding in the Clawnection app
    - Copy the Assistant ID (format: `asst_xxxxxxxxx` or UUID)
 
 4. **Set Environment Variables**:
-   Create a `.env.local` file in the project root:
+
+   Copy `.env.example` to `.env.local` in the project root:
+
+   ```bash
+   cp .env.example .env.local
    ```
+
+   Then set:
+
+   ```bash
    NEXT_PUBLIC_VAPI_API_KEY=your_vapi_api_key_here
    NEXT_PUBLIC_VAPI_ASSISTANT_ID=your_vapi_assistant_id_here
    ```
 
 5. **Restart the development server**:
+
    ```bash
    npm run dev
    ```
@@ -64,13 +74,6 @@ This page integrates Vapi for voice-based user onboarding in the Clawnection app
 2. Deploy to production environment for full testing
 3. Monitor call quality and duration
 4. Consider additional security measures if needed
+
 - ⚠️ Requires API keys to function
 - ⚠️ Data extraction uses simple JSON parsing (could be improved with better NLP)
-
-## Next Steps
-
-1. Set up Vapi account and get API keys
-2. Test the voice interaction
-3. Improve data extraction (perhaps use Vapi's structured conversation features)
-4. Add more sophisticated error handling
-5. Consider adding voice recording/transcription fallbacks

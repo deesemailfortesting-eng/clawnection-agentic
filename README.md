@@ -43,6 +43,28 @@ Deployment support now includes:
 
 ## Run locally
 
+1. Copy the example env file:
+
+```bash
+cp .env.example .env.local
+```
+
+1. Fill in the values you need in `.env.local`.
+
+Current app variables:
+
+- `NEXT_PUBLIC_VAPI_API_KEY`
+- `NEXT_PUBLIC_VAPI_ASSISTANT_ID`
+
+Notes:
+
+- `.env.local` is loaded by Next.js during `npm run dev`, `npm run build`, and `npm run start`
+- any variable prefixed with `NEXT_PUBLIC_` is exposed to the browser, so only put public client-safe values there
+- if you need local Cloudflare/Wrangler-only secrets, copy `.dev.vars.example` to `.dev.vars`
+- CLI-only values such as `CLOUDFLARE_API_TOKEN` still need to be exported in your shell or loaded by your preferred shell env tool before deploy commands
+
+1. Install dependencies and start the app:
+
 ```bash
 npm install
 npm run dev
