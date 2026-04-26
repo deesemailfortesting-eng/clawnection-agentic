@@ -2,8 +2,11 @@ import {
   ParsedMessage,
   SignalConfidence,
   SignalSensitivity,
+  WhatsAppConversationSignalProfile,
+  WhatsAppCoverageSummary,
   WhatsAppSignalExtractionMetadata,
   WhatsAppSignalFamilyMetadata,
+  WhatsAppGlobalSignalProfile,
   WhatsAppSignals,
 } from "@/lib/types/behavioral";
 
@@ -16,6 +19,7 @@ const EMOJI_RE = /\p{Emoji_Presentation}/gu;
 
 type ExtractSignalOptions = {
   extractionMetadata?: Partial<WhatsAppSignalExtractionMetadata>;
+  conversationId?: string;
 };
 
 function mean(values: number[]): number {
@@ -100,6 +104,125 @@ function buildShareableSummary(signals: Pick<WhatsAppSignals,
       confidence: signals.signalFamilyMetadata.responsiveness.confidence,
     },
   ];
+}
+
+function slugifyConversationId(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "conversation";
+}
+
+function uniqueActiveDays(messages: ParsedMessage[]): number {
+  return new Set(messages.map((message) => message.timestamp.toISOString().slice(0, 10))).size;
+}
+
+function getCoverageQuality(ownerMessageCount: number, totalMessages: number): SignalConfidence {
+  if (ownerMessageCount < LOW_CONFIDENCE_THRESHOLD || totalMessages < LOW_CONFIDENCE_THRESHOLD * 2) return "low";
+  if (ownerMessageCount < 75 || totalMessages < 150) return "medium";
+  return "high";
+}
+
+function buildCoverageSummary(
+  conversationProfiles: WhatsAppConversationSignalProfile[],
+  totalMessages: number,
+  ownerMessageCount: number,
+  dateRangeStart: Date,
+  dateRangeEnd: Date,
+): WhatsAppCoverageSummary {
+  const eligibleConversationCount = conversationProfiles.filter((profile) => profile.coverage.isSignalEligible).length;
+  const otherMessageCount = Math.max(0, totalMessages - ownerMessageCount);
+  const coverageQuality = getCoverageQuality(ownerMessageCount, totalMessages);
+  const warnings: string[] = [];
+
+  if (coverageQuality === "low") {
+    warnings.push("Signal confidence is limited because the conversation coverage is still thin.");
+  }
+  if (eligibleConversationCount === 0 && conversationProfiles.length > 0) {
+    warnings.push("No conversation yet meets the current eligibility threshold for strong signal interpretation.");
+  }
+
+  return {
+    conversationCount: conversationProfiles.length,
+    eligibleConversationCount,
+    messageCount: totalMessages,
+    ownerMessageCount,
+    otherMessageCount,
+    dateRangeStart,
+    dateRangeEnd,
+    coverageQuality,
+    warnings,
+  };
+}
+
+function buildConversationProfile(
+  messages: ParsedMessage[],
+  userName: string,
+  conversationId: string,
+): WhatsAppConversationSignalProfile {
+  const nonSystem = messages.filter((message) => !message.isSystem);
+  const userNorm = normalizedSenderName(userName);
+  const ownerMessages = nonSystem.filter((message) => normalizedSenderName(message.sender) === userNorm);
+  const otherMessages = nonSystem.filter((message) => normalizedSenderName(message.sender) !== userNorm);
+  const latencies = computeResponseLatencies(nonSystem, userName);
+  const avgResponseLatencyMs = mean(latencies);
+  const uniqueOtherParticipants = new Set(otherMessages.map((message) => normalizedSenderName(message.sender)));
+  const participantCount = uniqueOtherParticipants.size + 1;
+  const confidence = getCoverageQuality(ownerMessages.length, nonSystem.length);
+
+  return {
+    conversationId,
+    participantCount,
+    inferredRelationshipType: uniqueOtherParticipants.size > 1 ? "group-chat" : "direct-message",
+    coverage: {
+      messageCount: nonSystem.length,
+      ownerMessageCount: ownerMessages.length,
+      otherMessageCount: otherMessages.length,
+      activeDays: uniqueActiveDays(nonSystem),
+      isSignalEligible: ownerMessages.length >= 5 && otherMessages.length >= 5 && nonSystem.length >= 20,
+      confidence,
+    },
+    communicationStyle: {
+      derivedStyle: deriveCommunicationStyle(
+        ownerMessages.length === 0 ? 0 : ownerMessages.filter((message) => message.body.includes("?")).length / ownerMessages.length,
+        computeEmojiDensity(ownerMessages),
+        ownerMessages.length === 0 ? 0 : ownerMessages.filter((message) => message.body.length > 50).length / ownerMessages.length,
+        mean(ownerMessages.map((message) => message.body === "<Media omitted>" || message.body === "‎<Media omitted>" ? 0 : message.body.length)),
+        computeInitiationRatio(nonSystem, userName),
+      ),
+      avgResponseLatencyMs,
+      initiationRatio: computeInitiationRatio(nonSystem, userName),
+      longMessageRatio: ownerMessages.length === 0 ? 0 : ownerMessages.filter((message) => message.body.length > 50).length / ownerMessages.length,
+      emojiDensity: computeEmojiDensity(ownerMessages),
+    },
+    attachmentPattern: {
+      closeTieStabilityScore: computeCloseTieStability(nonSystem, userName),
+      responseConsistency: avgResponseLatencyMs === 0 ? "low" : getConfidence(ownerMessages.length),
+    },
+    policyTags: uniqueOtherParticipants.size > 1 ? ["private-only"] : ["shareable-summary"],
+  };
+}
+
+function buildGlobalProfile(
+  coverageSummary: WhatsAppCoverageSummary,
+  shareableSummary: WhatsAppSignals["shareableSummary"],
+  closeTieStabilityScore: number,
+): WhatsAppGlobalSignalProfile {
+  return {
+    coverage: coverageSummary,
+    shareableSummaryCandidates: shareableSummary.map((summary) => ({
+      summaryKey: summary.label.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+      summaryText: summary.value,
+      sourceSignalKeys: [summary.label],
+      confidence: summary.confidence,
+      approvedForAgentSharing: true,
+    })),
+    privateOnlySignals: [
+      {
+        signalKey: "close_tie_stability",
+        value: closeTieStabilityScore.toFixed(2),
+        reason: "Internal relationship-pattern signal used for downstream reasoning only.",
+        sensitivityClass: "private-only",
+      },
+    ],
+  };
 }
 
 function computeResponseLatencies(messages: ParsedMessage[], userName: string): number[] {
@@ -335,6 +458,14 @@ export function mergeSignals(signalsList: WhatsAppSignals[]): WhatsAppSignals {
   };
 
   const totalMessages = signalsList.reduce((sum, s) => sum + s.totalMessages, 0);
+  const conversationProfiles = signalsList.flatMap((signal) => signal.conversationProfiles);
+  const coverageSummary = buildCoverageSummary(
+    conversationProfiles,
+    totalMessages,
+    totalUserMessages,
+    new Date(Math.min(...allEarliest)),
+    new Date(Math.max(...allLatest)),
+  );
 
   const mergedSignals: WhatsAppSignals = {
     avgResponseLatencyMs,
@@ -360,9 +491,21 @@ export function mergeSignals(signalsList: WhatsAppSignals[]): WhatsAppSignals {
     extractionMetadata,
     signalFamilyMetadata,
     shareableSummary: [],
+    coverageSummary,
+    conversationProfiles,
+    globalProfile: {
+      coverage: coverageSummary,
+      shareableSummaryCandidates: [],
+      privateOnlySignals: [],
+    },
   };
 
   mergedSignals.shareableSummary = buildShareableSummary(mergedSignals);
+  mergedSignals.globalProfile = buildGlobalProfile(
+    coverageSummary,
+    mergedSignals.shareableSummary,
+    mergedSignals.closeTieStabilityScore,
+  );
 
   return mergedSignals;
 }
@@ -436,6 +579,15 @@ export function extractSignals(
     activeHours: buildFamilyMetadata(userMessages.length, totalMessages, extractionMetadata, "shareable-summary"),
     relationshipPatterns: buildFamilyMetadata(userMessages.length, totalMessages, extractionMetadata, "private-only"),
   };
+  const conversationId = options?.conversationId ? slugifyConversationId(options.conversationId) : "conversation";
+  const conversationProfiles = [buildConversationProfile(messages, userName, conversationId)];
+  const coverageSummary = buildCoverageSummary(
+    conversationProfiles,
+    totalMessages,
+    userMessages.length,
+    earliest,
+    latest,
+  );
 
   const signals: WhatsAppSignals = {
     avgResponseLatencyMs: avgLatencyMs,
@@ -458,9 +610,21 @@ export function extractSignals(
     extractionMetadata,
     signalFamilyMetadata,
     shareableSummary: [],
+    coverageSummary,
+    conversationProfiles,
+    globalProfile: {
+      coverage: coverageSummary,
+      shareableSummaryCandidates: [],
+      privateOnlySignals: [],
+    },
   };
 
   signals.shareableSummary = buildShareableSummary(signals);
+  signals.globalProfile = buildGlobalProfile(
+    coverageSummary,
+    signals.shareableSummary,
+    signals.closeTieStabilityScore,
+  );
 
   return signals;
 }

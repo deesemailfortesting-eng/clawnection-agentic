@@ -101,6 +101,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
             parseErrors: parseResult.parseErrors,
             detectedFormats: [parseResult.detectedFormat],
           },
+          conversationId: file.name,
         });
         if (signals.userMessageCount === 0) {
           errors.push(`${file.name}: no messages from "${trimmedName}" — check the name matches exactly`);
@@ -191,6 +192,8 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
             <div><span className="text-zinc-500">Derived style</span><span className="ml-2 font-medium text-zinc-800">{s.derivedCommunicationStyle}</span></div>
             <div><span className="text-zinc-500">Signal confidence</span><span className="ml-2 font-medium text-zinc-800">{s.signalFamilyMetadata.communicationStyle.confidence}</span></div>
             <div><span className="text-zinc-500">Source coverage</span><span className="ml-2 font-medium text-zinc-800">{s.extractionMetadata.fileCount} file{ s.extractionMetadata.fileCount > 1 ? "s" : "" } · {s.extractionMetadata.detectedFormats.join(", ")}</span></div>
+            <div><span className="text-zinc-500">Eligible conversations</span><span className="ml-2 font-medium text-zinc-800">{s.coverageSummary.eligibleConversationCount}/{s.coverageSummary.conversationCount}</span></div>
+            <div><span className="text-zinc-500">Coverage quality</span><span className="ml-2 font-medium text-zinc-800">{s.coverageSummary.coverageQuality}</span></div>
           </div>
 
           <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-zinc-700">
@@ -209,6 +212,27 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
               ))}
             </div>
           </div>
+
+          {s.conversationProfiles.length > 0 && (
+            <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700">
+              <p className="font-medium text-zinc-900">Conversation coverage</p>
+              <div className="mt-2 space-y-2">
+                {s.conversationProfiles.map((profile) => (
+                  <div key={profile.conversationId} className="flex items-start justify-between gap-4 border-b border-zinc-100 pb-2 last:border-b-0 last:pb-0">
+                    <div>
+                      <p className="font-medium text-zinc-800">{profile.conversationId}</p>
+                      <p className="text-zinc-500">
+                        {profile.coverage.messageCount} messages · {profile.coverage.activeDays} active day{profile.coverage.activeDays === 1 ? "" : "s"} · {profile.inferredRelationshipType}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700">
+                      {profile.coverage.confidence}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {!s.isLowConfidence && changedFields.length > 0 ? (
             <div className="rounded-xl border border-emerald-300 bg-white px-4 py-3 text-sm text-zinc-700">
