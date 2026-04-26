@@ -9,6 +9,8 @@ import {
   VirtualDateRound,
   VirtualDateRoundType,
 } from "@/lib/types/matching";
+import { WhatsAppSignals } from "@/lib/types/behavioral";
+import { loadSignals } from "@/lib/storage";
 
 const ROUND_TITLES: Record<VirtualDateRoundType, string> = {
   introductions: "Round 1 · Introductions",
@@ -28,8 +30,9 @@ const ROUND_ORDER: VirtualDateRoundType[] = [
   "fun-chemistry",
 ];
 
-function getAdapter(type: RomanticProfile["agentType"]): AgentAdapter {
-  return type === "hosted" ? new HostedAgentAdapter() : new MockExternalAgentAdapter();
+function getAdapter(type: RomanticProfile["agentType"], signals?: WhatsAppSignals | null): AgentAdapter {
+  if (type === "hosted") return new HostedAgentAdapter(signals ?? null);
+  return new MockExternalAgentAdapter();
 }
 
 function overlap(a: string[], b: string[]) {
@@ -41,7 +44,7 @@ function hasDealbreakerConflict(a: RomanticProfile, b: RomanticProfile) {
   return a.dealbreakers.some((dealbreaker) => bText.includes(dealbreaker.toLowerCase()));
 }
 
-function scoreProfiles(a: RomanticProfile, b: RomanticProfile) {
+function scoreProfiles(a: RomanticProfile, b: RomanticProfile, signalsA: WhatsAppSignals | null = null) {
   let score = 50;
   const strengths: string[] = [];
   const concerns: Concern[] = [];
@@ -67,7 +70,34 @@ function scoreProfiles(a: RomanticProfile, b: RomanticProfile) {
     });
   }
 
-  if (communicationMatch) {
+  if (signalsA && !signalsA.isLowConfidence) {
+    // Use behavioral signals instead of stated communicationStyle for profile A
+    const derivedStyle = signalsA.derivedCommunicationStyle;
+    if (derivedStyle === b.communicationStyle) {
+      score += 8;
+      strengths.push(`Behavioral communication style (${derivedStyle}) aligns with counterpart.`);
+    } else {
+      score -= 4;
+      concerns.push({
+        title: "Communication style gap",
+        detail: `Behavioral analysis suggests ${a.name} communicates as ${derivedStyle}, while ${b.name} is more ${b.communicationStyle}.`,
+        severity: "low",
+      });
+    }
+
+    // Pace complementarity bonus: fast responders match well with direct/warm; slow with reflective
+    const latencyMin = signalsA.avgResponseLatencyMs / 60_000;
+    const isInconsistent = signalsA.responseLatencyStdDevMs > signalsA.avgResponseLatencyMs * 1.5;
+    if (latencyMin < 30 && (b.communicationStyle === "direct" || b.communicationStyle === "warm")) {
+      score += 3;
+    }
+    if (latencyMin > 240 && b.communicationStyle === "reflective") {
+      score += 3;
+    }
+    if (isInconsistent && b.communicationStyle === "warm") {
+      score -= 3;
+    }
+  } else if (communicationMatch) {
     score += 8;
     strengths.push(`Compatible communication style (${a.communicationStyle}).`);
   } else {
@@ -187,7 +217,8 @@ function suggestFirstDate(a: RomanticProfile, b: RomanticProfile, sharedInterest
 }
 
 export function runVirtualDateSimulation(profileA: RomanticProfile, profileB: RomanticProfile): MatchResult {
-  const adapterA = getAdapter(profileA.agentType);
+  const signalsA = loadSignals();
+  const adapterA = getAdapter(profileA.agentType, signalsA);
   const adapterB = getAdapter(profileB.agentType);
 
   const rounds: VirtualDateRound[] = ROUND_ORDER.map((type, index) => {
@@ -207,7 +238,7 @@ export function runVirtualDateSimulation(profileA: RomanticProfile, profileB: Ro
     };
   });
 
-  const evaluated = scoreProfiles(profileA, profileB);
+  const evaluated = scoreProfiles(profileA, profileB, signalsA);
   const recommendation = buildRecommendation(evaluated.score, evaluated.concerns);
   const firstDateSuggestion = suggestFirstDate(profileA, profileB, evaluated.sharedInterests);
 

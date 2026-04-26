@@ -3,8 +3,10 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { OnboardingSection } from "@/components/OnboardingSection";
-import { saveProfile } from "@/lib/storage";
+import { saveProfile, saveSignals, saveGap } from "@/lib/storage";
 import { CommunicationStyle, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
+import { SelfAwarenessGap, WhatsAppSignals } from "@/lib/types/behavioral";
+import { WhatsAppUpload } from "@/components/WhatsAppUpload";
 
 type FormState = {
   name: string;
@@ -68,11 +70,52 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(defaultForm);
   const [error, setError] = useState<string | null>(null);
+  const [whatsAppApplied, setWhatsAppApplied] = useState(false);
 
   const profilePreview = useMemo(() => `${form.name || "Your name"}, intent: ${form.relationshipIntent}`, [form]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function buildCurrentProfile(): RomanticProfile {
+    return {
+      id: `local-${form.name.toLowerCase().replace(/\s+/g, "-")}`,
+      name: form.name || "You",
+      age: Number(form.age) || 25,
+      genderIdentity: form.genderIdentity,
+      lookingFor: form.lookingFor,
+      location: form.location,
+      relationshipIntent: form.relationshipIntent,
+      bio: form.bio,
+      interests: parseCsv(form.interests),
+      values: parseCsv(form.values),
+      communicationStyle: form.communicationStyle,
+      lifestyleHabits: {
+        sleepSchedule: form.sleepSchedule,
+        socialEnergy: form.socialEnergy,
+        activityLevel: form.activityLevel,
+        drinking: form.drinking,
+        smoking: form.smoking,
+      },
+      dealbreakers: parseCsv(form.dealbreakers),
+      idealFirstDate: form.idealFirstDate,
+      preferenceAgeRange: { min: Number(form.preferenceMinAge) || 18, max: Number(form.preferenceMaxAge) || 60 },
+      preferenceNotes: form.preferenceNotes,
+      agentType: form.agentType,
+    };
+  }
+
+  function handleWhatsAppApply(
+    updatedProfile: RomanticProfile,
+    signals: WhatsAppSignals,
+    gap: SelfAwarenessGap,
+  ) {
+    update("communicationStyle", updatedProfile.communicationStyle);
+    update("sleepSchedule", updatedProfile.lifestyleHabits.sleepSchedule);
+    saveSignals(signals);
+    saveGap(gap);
+    setWhatsAppApplied(true);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -211,6 +254,21 @@ export default function OnboardingPage() {
                 <input className={fieldClass} value={form.idealFirstDate} onChange={(e) => update("idealFirstDate", e.target.value)} />
               </label>
             </div>
+          </OnboardingSection>
+
+          <OnboardingSection
+            title={
+              whatsAppApplied
+                ? "Enrich with your WhatsApp data · Behavioral data applied ✓"
+                : "Enrich with your WhatsApp data"
+            }
+            description="Optional. Upload one WhatsApp chat export — your data stays in your browser only."
+          >
+            <WhatsAppUpload
+              currentProfile={buildCurrentProfile()}
+              onApply={handleWhatsAppApply}
+              onSkip={() => {}}
+            />
           </OnboardingSection>
 
           <OnboardingSection title="Match preferences + agent mode" description="Set your counterpart preferences and choose your personal agent path.">
