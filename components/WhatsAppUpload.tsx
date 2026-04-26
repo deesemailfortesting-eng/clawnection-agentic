@@ -27,7 +27,7 @@ type UploadState =
 
 type WhatsAppUploadProps = {
   currentProfile: RomanticProfile;
-  onApply: (updatedProfile: RomanticProfile, signals: WhatsAppSignals, gap: SelfAwarenessGap) => void;
+  onApply: (updatedProfile: RomanticProfile, signals: WhatsAppSignals, gap: SelfAwarenessGap, fileCount: number) => void;
   onSkip: () => void;
 };
 
@@ -260,7 +260,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => onApply(state.updatedProfile, state.mergedSignals, state.gap)}
+            onClick={() => onApply(state.updatedProfile, state.mergedSignals, state.gap, state.fileResults.length)}
             className="flex-1 rounded-xl bg-emerald-500/80 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
           >
             Apply to profile
@@ -298,7 +298,7 @@ export function WhatsAppUpload({ currentProfile, onApply, onSkip }: WhatsAppUplo
         <ul className="space-y-1 text-white/62">
           <li>Used internally: your uploaded chats are analyzed to derive behavioral signals and compare them to your stated profile.</li>
           <li>Surfaced to you: only summary metrics and profile updates are shown in this flow, not raw transcript excerpts.</li>
-          <li>Storage in this MVP: data is processed in your browser and saved locally on this device via browser storage.</li>
+          <li>Storage in this MVP: data is processed in your browser, cached on this device, and synced to the prototype backend when available.</li>
           <li>Revocation in this MVP: you can clear your browser storage later to remove saved profile and signal data from this prototype.</li>
         </ul>
 

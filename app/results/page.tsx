@@ -8,27 +8,66 @@ import { PhoneShell } from "@/components/PhoneShell";
 import { ProfileCard } from "@/components/ProfileCard";
 import { RecommendationBadge } from "@/components/RecommendationBadge";
 import { VirtualDateRoundCard } from "@/components/VirtualDateRoundCard";
-import { loadResult } from "@/lib/storage";
+import { loadResult, loadResultFromServer } from "@/lib/storage";
 import { MatchResult } from "@/lib/types/matching";
 
 export default function ResultsPage() {
   const router = useRouter();
-  const [result] = useState<MatchResult | null>(() => {
+  const [resultId, setResultId] = useState<string | null>(null);
+  const [result, setResult] = useState<MatchResult | null>(() => {
     if (typeof window === "undefined") return null;
     return loadResult();
   });
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setResultId(params.get("resultId"));
+  }, []);
 
   useEffect(() => {
     document.title = "Virtual date results · wtfradar";
-    if (!result) {
+
+    let cancelled = false;
+
+    async function restoreResult() {
+      const cachedResult = typeof window === "undefined" ? null : loadResult();
+
+      if (cachedResult) {
+        setResult(cachedResult);
+      }
+
+      if (resultId) {
+        const serverResult = await loadResultFromServer(resultId);
+        if (cancelled) return;
+        if (serverResult) {
+          setResult(serverResult);
+          setIsRestoring(false);
+          return;
+        }
+      }
+
+      if (cachedResult) {
+        setIsRestoring(false);
+        return;
+      }
+
+      setIsRestoring(false);
       router.replace("/demo");
     }
-  }, [result, router]);
+
+    void restoreResult();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resultId, router]);
 
   if (!result) {
     return (
       <PhoneShell>
-        <main className="screen-padding" />
+        <main className="screen-padding">{isRestoring ? null : null}</main>
       </PhoneShell>
     );
   }
