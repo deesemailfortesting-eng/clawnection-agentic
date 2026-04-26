@@ -1,8 +1,9 @@
 type CompatibilityScoreProps = {
   score: number;
+  narration?: string;
 };
 
-export function CompatibilityScore({ score }: CompatibilityScoreProps) {
+export function CompatibilityScore({ score, narration }: CompatibilityScoreProps) {
   const hue = score >= 75 ? "bg-emerald-400" : score >= 55 ? "bg-amber-400" : "bg-[#ff4458]";
   const summary =
     score >= 75
@@ -18,7 +19,7 @@ export function CompatibilityScore({ score }: CompatibilityScoreProps) {
         <p className="text-5xl font-black tracking-tight text-white">{score}</p>
         <p className="pb-2 text-sm text-white/50">out of 100</p>
       </div>
-      <p className="mt-2 text-sm font-bold text-white/74">{summary}</p>
+      <p className="mt-2 text-sm font-bold text-white/74">{narration ?? summary}</p>
       <div
         className="mt-4 h-3 w-full overflow-hidden rounded-full bg-white/10"
         role="img"

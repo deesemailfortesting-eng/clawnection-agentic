@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CompatibilityScore } from "@/components/CompatibilityScore";
 import { ProfileCard } from "@/components/ProfileCard";
 import { RecommendationBadge } from "@/components/RecommendationBadge";
 import { VirtualDateRoundCard } from "@/components/VirtualDateRoundCard";
 import { AppHeader } from "@/components/AppHeader";
 import { PhoneShell } from "@/components/PhoneShell";
-import { loadResult } from "@/lib/storage";
+import { loadResult, loadResultFromServer } from "@/lib/storage";
 import { MatchResult } from "@/lib/types/matching";
 
 function scoreNarration(score: number): string {
@@ -23,22 +23,57 @@ function scoreNarration(score: number): string {
 }
 
 export default function ResultsPage() {
+  return (
+    <Suspense fallback={<PhoneShell><p className="py-12 text-center text-sm text-[var(--text-muted)]">Loading results...</p></PhoneShell>}>
+      <ResultsContent />
+    </Suspense>
+  );
+}
+
+function ResultsContent() {
   const router = useRouter();
-  const [result] = useState<MatchResult | null>(() => {
+  const searchParams = useSearchParams();
+  const matchId = searchParams.get("id");
+
+  const [result, setResult] = useState<MatchResult | null>(() => {
+    if (matchId) return null; // will fetch from server
     if (typeof window === "undefined") return null;
     return loadResult();
   });
+  const [fetchError, setFetchError] = useState(false);
 
   useEffect(() => {
-    if (!result) {
+    if (matchId) {
+      loadResultFromServer(matchId).then((serverResult) => {
+        if (serverResult) {
+          setResult(serverResult);
+        } else {
+          setFetchError(true);
+        }
+      });
+    } else if (!result) {
       router.replace("/demo");
     }
-  }, [result, router]);
+  }, [matchId, result, router]);
+
+  if (fetchError) {
+    return (
+      <PhoneShell label="Error loading results">
+        <AppHeader />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12">
+          <p className="text-sm text-red-400">Could not load match result.</p>
+          <Link href="/demo" className="btn-primary touch-target text-center no-underline">
+            Back to demo
+          </Link>
+        </div>
+      </PhoneShell>
+    );
+  }
 
   if (!result) {
     return (
       <PhoneShell label="Loading results">
-        <p className="py-12 text-center text-sm text-[var(--text-muted)]">Loading results…</p>
+        <p className="py-12 text-center text-sm text-[var(--text-muted)]">Loading results...</p>
       </PhoneShell>
     );
   }
@@ -141,7 +176,7 @@ export default function ResultsPage() {
           <Link href="/demo" className="btn-primary touch-target text-center no-underline">
             Run another sample introduction
           </Link>
-          <Link href="/onboarding" className="btn-secondary touch-target text-center no-underline">
+          <Link href="/review-profile" className="btn-secondary touch-target text-center no-underline">
             Edit profile using the form
           </Link>
         </nav>

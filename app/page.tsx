@@ -39,8 +39,8 @@ export default function HomePage() {
         </header>
 
         <nav aria-label="Primary actions" className="flex flex-col gap-3">
-          <Link href="/onboarding" className="btn-primary touch-target w-full text-center no-underline">
-            Build profile with the form
+          <Link href="/review-profile" className="btn-primary touch-target w-full text-center no-underline">
+            Create my profile
           </Link>
           <Link
             href="/voice-onboarding"

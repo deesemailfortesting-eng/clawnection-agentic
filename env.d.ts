@@ -1,5 +1,6 @@
 interface CloudflareEnv {
   DB: D1Database;
+  SCORING_WEIGHTS?: string;
 }
 
 /** Set in Worker / Next for session cookies and Apple token audience. */

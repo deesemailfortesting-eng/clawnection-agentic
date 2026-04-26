@@ -154,7 +154,7 @@ export default function VoiceOnboardingPage() {
       saveProfile(romanticProfile);
       syncProfileToServer(romanticProfile);
       setIsComplete(true);
-      setTimeout(() => router.push("/demo"), 2000);
+      setTimeout(() => router.push("/review-profile?from=voice"), 2000);
     },
     [router],
   );
@@ -492,7 +492,7 @@ export default function VoiceOnboardingPage() {
 
         <p className="text-center text-sm text-[var(--text-secondary)]">
           Prefer the form?{" "}
-          <Link href="/onboarding" className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline">
+          <Link href="/review-profile" className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline">
             Open text-based profile onboarding
           </Link>
           .

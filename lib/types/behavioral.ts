@@ -10,10 +10,10 @@ export type SignalConfidence = "low" | "medium" | "high";
 export type SignalSensitivity = "shareable-summary" | "private-only";
 
 export type WhatsAppSignalExtractionMetadata = {
-  source: "whatsapp-export";
+  source: "whatsapp-export" | "fb-messenger-export";
   fileCount: number;
   parseErrors: number;
-  detectedFormats: Array<"ios" | "android" | "unknown">;
+  detectedFormats: Array<"ios" | "android" | "fb-messenger" | "unknown">;
 };
 
 export type WhatsAppSignalFamilyMetadata = {
