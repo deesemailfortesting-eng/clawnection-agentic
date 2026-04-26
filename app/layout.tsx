@@ -1,32 +1,26 @@
-import type { Metadata, Viewport } from "next";
-import { AuthProvider } from "@/lib/auth/AuthProvider";
+import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://wtfradar.com"),
   title: {
-    default: "WTF Radar · AI dating",
-    template: "%s · WTF Radar",
+    default: "wtfradar · AI dating that checks the vibe first",
+    template: "%s · wtfradar",
   },
   description:
-    "WTF Radar is an AI-assisted dating platform. Your agent runs structured virtual introductions; you decide every real-world next step.",
-  applicationName: "WTF Radar",
-  alternates: {
-    canonical: "/",
+    "A mobile-first AI dating platform where personal agents run structured virtual dates before people decide whether to meet.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.svg", type: "image/svg+xml" }],
   },
-  openGraph: {
-    title: "WTF Radar",
-    description: "AI-assisted dating with human control at every step.",
-    type: "website",
-    siteName: "WTF Radar",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "wtfradar",
   },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#0a0a0b",
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -39,9 +33,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://use.typekit.net/qly1tpd.css" />
       </head>
-      <body className="tk-fiona min-h-full bg-[var(--surface-base)] text-[var(--text-primary)]">
-        <AuthProvider>{children}</AuthProvider>
-      </body>
+      <body className="min-h-full bg-background font-sans text-foreground">{children}</body>
     </html>
   );
 }
