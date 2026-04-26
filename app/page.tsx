@@ -1,87 +1,47 @@
 import Link from "next/link";
 import { PhoneShell } from "@/components/PhoneShell";
 
-const featureCards = [
-  {
-    title: "Your agent listens first",
-    description:
-      "Build a dating profile by voice or text, then let your private agent represent your intent and boundaries.",
-  },
-  {
-    title: "Dates happen in simulation",
-    description:
-      "Agents run a bounded virtual date and explain their recommendation before people decide whether to meet.",
-  },
-  {
-    title: "People stay in control",
-    description:
-      "wtfradar shows strengths, concerns, and a plain-language summary. You make the final choice.",
-  },
-];
-
 export default function HomePage() {
   return (
     <PhoneShell>
-      <main className="screen-padding space-y-8">
-        <header className="space-y-7">
-          <nav aria-label="Primary" className="liquid-surface flex items-center justify-between rounded-full px-2 py-2">
-            <Link href="/" className="px-3 text-lg font-black tracking-tight text-white" aria-label="wtfradar home">
-              wtf<span className="radar-text-gradient">radar</span>
-            </Link>
-            <Link href="/sign-in" className="secondary-button min-h-10 px-4 py-2 text-sm">
-              Sign in
-            </Link>
-          </nav>
-
-          <section aria-labelledby="home-title" className="space-y-5">
-            <div className="hero-orb" aria-hidden="true">
-              <span className="hero-orb-dot" />
-            </div>
-            <div className="space-y-4">
-              <p className="pill w-fit">AI dating for the group chat era</p>
-              <h1 id="home-title" className="text-5xl font-black leading-[0.92] tracking-[-0.055em] text-white">
-                Let your AI check the vibe first.
-              </h1>
-              <p className="text-base leading-7 text-white/70">
-                wtfradar is a phone-first dating platform where personal agents run a private, structured virtual date before you spend energy on a real one.
-              </p>
-            </div>
-            <div className="grid gap-3" aria-label="Start wtfradar">
-              <Link href="/sign-in" className="primary-button">
-                Create a secure account
-              </Link>
-              <Link href="/voice-onboarding" className="secondary-button">
-                Build my profile by voice
-              </Link>
-            </div>
-          </section>
-        </header>
-
-        <section aria-labelledby="why-title" className="space-y-4">
-          <h2 id="why-title" className="text-2xl font-black tracking-tight text-white">
-            Dating signals, explained plainly.
-          </h2>
-          {featureCards.map((card) => (
-            <article key={card.title} className="obsidian-card rounded-[28px] p-5">
-              <h3 className="text-lg font-black text-white">{card.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-white/68">{card.description}</p>
-            </article>
-          ))}
+      <main className="screen-padding flex min-h-dvh flex-col justify-between gap-10">
+        <section
+          aria-labelledby="home-title"
+          className="flex flex-1 flex-col items-center justify-center gap-4 text-center"
+        >
+          <h1
+            id="home-title"
+            className="text-6xl font-black tracking-[-0.05em] text-white"
+          >
+            wtf<span className="radar-text-gradient">radar</span>
+          </h1>
         </section>
 
-        <section aria-labelledby="flow-title" className="obsidian-panel rounded-[32px] p-5">
-          <h2 id="flow-title" className="text-xl font-black text-white">How wtfradar works</h2>
-          <ol className="mt-5 space-y-4 text-sm leading-6 text-white/72">
-            <li><strong className="text-white">1. Sign in securely.</strong> Use email and password or Apple sign-in.</li>
-            <li><strong className="text-white">2. Build your profile.</strong> Choose text onboarding or a guided voice conversation with visible instructions.</li>
-            <li><strong className="text-white">3. Run a virtual date.</strong> Your agent compares values, intent, communication, and boundaries.</li>
-            <li><strong className="text-white">4. Review the result.</strong> Read a clear recommendation and decide what feels right.</li>
-          </ol>
-        </section>
-
-        <footer className="border-t border-white/10 pt-5 text-xs leading-5 text-white/48">
-          <p>Agents recommend; people choose. If you need reasonable accommodations while using wtfradar, contact support through your account settings.</p>
-        </footer>
+        <div className="space-y-3">
+          <Link href="/sign-in" className="primary-button w-full">
+            Sign up with email
+          </Link>
+          <Link href="/voice-onboarding" className="apple-sign-in-button">
+            <svg
+              aria-hidden="true"
+              focusable="false"
+              viewBox="0 0 14 17"
+              className="apple-glyph"
+              fill="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M11.6233 8.91328C11.6062 6.9707 13.2155 6.0293 13.2862 5.98438C12.3754 4.65625 10.9568 4.47461 10.4519 4.45508C9.25147 4.33008 8.10303 5.16602 7.49561 5.16602C6.87646 5.16602 5.94287 4.46875 4.93653 4.48828C3.62037 4.50781 2.39115 5.26953 1.71291 6.45117C0.337891 8.83594 1.36475 12.3535 2.69584 14.291C3.35303 15.2422 4.12451 16.3047 5.13428 16.2676C6.11846 16.2266 6.49072 15.6328 7.68018 15.6328C8.85791 15.6328 9.20654 16.2676 10.2393 16.2461C11.2998 16.2266 11.9658 15.2734 12.6035 14.3164C13.3613 13.2148 13.6748 12.1387 13.6904 12.0879C13.665 12.0801 11.6428 11.293 11.6233 8.91328Z" />
+              <path d="M9.69189 3.16797C10.2207 2.50781 10.5849 1.61133 10.4853 0.703125C9.71728 0.736328 8.74435 1.21484 8.19581 1.86133C7.71045 2.43164 7.27276 3.36719 7.38525 4.24414C8.24902 4.30859 9.14014 3.81836 9.69189 3.16797Z" />
+            </svg>
+            <span>Sign up with Apple</span>
+          </Link>
+          <Link
+            href="/sign-in"
+            className="block w-full pt-2 text-center text-sm font-bold text-white/72 hover:text-white"
+          >
+            Sign in
+          </Link>
+        </div>
       </main>
     </PhoneShell>
   );

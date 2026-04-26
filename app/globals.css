@@ -407,6 +407,47 @@ select.field option {
   transition: width 180ms ease;
 }
 
+/*
+ * Sign in with Apple button — follows Apple's Human Interface Guidelines.
+ * Uses the standard black treatment, system font, official Apple glyph, a
+ * 44px minimum height, and maximum corner radius.
+ */
+.apple-sign-in-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 9999px;
+  background: #000000;
+  color: #ffffff;
+  padding: 0 24px;
+  font-family: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.apple-sign-in-button:hover {
+  opacity: 0.92;
+}
+
+.apple-sign-in-button:active {
+  opacity: 0.85;
+  transform: scale(0.99);
+}
+
+.apple-sign-in-button .apple-glyph {
+  width: 16px;
+  height: 18px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
 @media (prefers-contrast: more) {
   :root {
     --glass-fill: rgba(63, 21, 37, 0.92);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { RomanticProfile } from "@/lib/types/matching";
+import { Occupation, RomanticProfile } from "@/lib/types/matching";
 
 export const runtime = "edge";
 
@@ -12,18 +12,25 @@ export async function POST(req: NextRequest) {
   await db
     .prepare(
       `INSERT INTO profiles (
-        id, name, age, gender_identity, looking_for, location,
+        id, name, last_name, age, phone_number, gender_identity, looking_for, location,
+        occupation_type, occupation_place, instagram, linkedin,
         relationship_intent, bio, interests, profile_values,
         communication_style, lifestyle_habits, dealbreakers,
         ideal_first_date, preference_age_min, preference_age_max,
         preference_notes, agent_type, updated_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
+        last_name = excluded.last_name,
         age = excluded.age,
+        phone_number = excluded.phone_number,
         gender_identity = excluded.gender_identity,
         looking_for = excluded.looking_for,
         location = excluded.location,
+        occupation_type = excluded.occupation_type,
+        occupation_place = excluded.occupation_place,
+        instagram = excluded.instagram,
+        linkedin = excluded.linkedin,
         relationship_intent = excluded.relationship_intent,
         bio = excluded.bio,
         interests = excluded.interests,
@@ -41,10 +48,16 @@ export async function POST(req: NextRequest) {
     .bind(
       profile.id,
       profile.name,
+      profile.lastName ?? null,
       profile.age,
+      profile.phoneNumber ?? null,
       profile.genderIdentity,
       profile.lookingFor,
       profile.location,
+      profile.occupation?.type ?? null,
+      profile.occupation?.place ?? null,
+      profile.instagram ?? null,
+      profile.linkedin ?? null,
       profile.relationshipIntent,
       profile.bio,
       JSON.stringify(profile.interests),
@@ -77,13 +90,25 @@ export async function GET(req: NextRequest) {
 }
 
 function rowToProfile(row: Record<string, unknown>): RomanticProfile {
+  const occupationType = (row.occupation_type as string | null) ?? null;
+  const occupationPlace = (row.occupation_place as string | null) ?? null;
+  let occupation: Occupation | undefined;
+  if (occupationType === "work" || occupationType === "school") {
+    occupation = { type: occupationType, place: occupationPlace ?? "" };
+  }
+
   return {
     id: row.id as string,
     name: row.name as string,
+    lastName: (row.last_name as string | null) ?? undefined,
     age: row.age as number,
+    phoneNumber: (row.phone_number as string | null) ?? undefined,
     genderIdentity: row.gender_identity as string,
     lookingFor: row.looking_for as string,
     location: row.location as string,
+    occupation,
+    instagram: (row.instagram as string | null) ?? undefined,
+    linkedin: (row.linkedin as string | null) ?? undefined,
     relationshipIntent: row.relationship_intent as RomanticProfile["relationshipIntent"],
     bio: row.bio as string,
     interests: JSON.parse((row.interests as string) || "[]"),
