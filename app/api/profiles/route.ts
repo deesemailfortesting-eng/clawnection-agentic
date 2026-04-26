@@ -13,12 +13,12 @@ export async function POST(req: NextRequest) {
     .prepare(
       `INSERT INTO profiles (
         id, name, last_name, age, phone_number, gender_identity, looking_for, location,
-        occupation_type, occupation_place, instagram, linkedin,
+        occupation_type, occupation_place, photo_url, instagram, linkedin,
         relationship_intent, bio, interests, profile_values,
         communication_style, lifestyle_habits, dealbreakers,
         ideal_first_date, preference_age_min, preference_age_max,
         preference_notes, agent_type, updated_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         last_name = excluded.last_name,
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
         location = excluded.location,
         occupation_type = excluded.occupation_type,
         occupation_place = excluded.occupation_place,
+        photo_url = excluded.photo_url,
         instagram = excluded.instagram,
         linkedin = excluded.linkedin,
         relationship_intent = excluded.relationship_intent,
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest) {
       profile.location,
       profile.occupation?.type ?? null,
       profile.occupation?.place ?? null,
+      profile.photoUrl ?? null,
       profile.instagram ?? null,
       profile.linkedin ?? null,
       profile.relationshipIntent,
@@ -107,6 +109,7 @@ function rowToProfile(row: Record<string, unknown>): RomanticProfile {
     lookingFor: row.looking_for as string,
     location: row.location as string,
     occupation,
+    photoUrl: (row.photo_url as string | null) ?? undefined,
     instagram: (row.instagram as string | null) ?? undefined,
     linkedin: (row.linkedin as string | null) ?? undefined,
     relationshipIntent: row.relationship_intent as RomanticProfile["relationshipIntent"],

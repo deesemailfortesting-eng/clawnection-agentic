@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
 import { PhoneShell } from "@/components/PhoneShell";
+import { PhotoPicker } from "@/components/PhotoPicker";
 import { VoiceOrb } from "@/components/VoiceOrb";
 import { saveProfile, syncProfileToServer } from "@/lib/storage";
 import {
@@ -54,6 +55,7 @@ type StepId =
   | "gender"
   | "preference"
   | "intent"
+  | "photo"
   | "socials"
   | "voice";
 
@@ -68,9 +70,82 @@ const STEP_ORDER: StepId[] = [
   "gender",
   "preference",
   "intent",
+  "photo",
   "socials",
   "voice",
 ];
+
+/*
+ * Group the steps into three user-centric phases. The progress bar shows
+ * exactly three segments so users feel like they're checking off accomplishments
+ * rather than counting "step 7 of 12".
+ */
+type PhaseId = "basics" | "vibe" | "voice";
+
+type Phase = {
+  id: PhaseId;
+  label: string;
+  inProgressLabel: string;
+  doneLabel: string;
+  steps: StepId[];
+};
+
+const PHASES: Phase[] = [
+  {
+    id: "basics",
+    label: "The basics",
+    inProgressLabel: "Let's get to know you",
+    doneLabel: "Basics ✓",
+    steps: ["welcome", "name", "dob", "phone", "location", "occupationType", "occupationPlace"],
+  },
+  {
+    id: "vibe",
+    label: "Your vibe",
+    inProgressLabel: "Tell us your vibe",
+    doneLabel: "Vibe ✓",
+    steps: ["gender", "preference", "intent", "photo", "socials"],
+  },
+  {
+    id: "voice",
+    label: "Meet your AI",
+    inProgressLabel: "Meet your AI",
+    doneLabel: "All done ✓",
+    steps: ["voice"],
+  },
+];
+
+function getPhaseFor(step: StepId): Phase {
+  return PHASES.find((p) => p.steps.includes(step)) ?? PHASES[0];
+}
+
+/*
+ * Returns each phase's state for the progress bar. A phase is `done` when the
+ * user has moved past its last step, `active` when their current step is
+ * inside it (with a 0..1 fill ratio for the active segment), and `upcoming`
+ * otherwise.
+ */
+function getPhaseProgress(currentStep: StepId): Array<{
+  phase: Phase;
+  state: "done" | "active" | "upcoming";
+  fillRatio: number;
+}> {
+  const currentPhaseId = getPhaseFor(currentStep).id;
+  let seenActive = false;
+  return PHASES.map((phase) => {
+    if (phase.id === currentPhaseId) {
+      seenActive = true;
+      const idxInPhase = phase.steps.indexOf(currentStep);
+      // Make even the very first step show some fill so the user feels they've
+      // already taken a step forward by landing on this phase.
+      const denom = Math.max(phase.steps.length - 1, 1);
+      const ratio = phase.steps.length === 1 ? 1 : Math.max(0.18, idxInPhase / denom);
+      return { phase, state: "active" as const, fillRatio: ratio };
+    }
+    return seenActive
+      ? { phase, state: "upcoming" as const, fillRatio: 0 }
+      : { phase, state: "done" as const, fillRatio: 1 };
+  });
+}
 
 /*
  * Capitalize each name token. Splits on spaces, hyphens, and apostrophes so
@@ -217,6 +292,8 @@ export default function VoiceOnboardingPage() {
   const [gender, setGender] = useState("");
   const [preference, setPreference] = useState("");
   const [intent, setIntent] = useState<RelationshipIntent | "">("");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [instagram, setInstagram] = useState("");
   const [linkedin, setLinkedin] = useState("");
 
@@ -279,6 +356,7 @@ export default function VoiceOnboardingPage() {
         lookingFor: data.lookingFor || preference || "",
         location: location || data.location || "",
         occupation,
+        photoUrl: photoUrl || undefined,
         instagram: instagram || data.instagram || undefined,
         linkedin: linkedin || data.linkedin || undefined,
         relationshipIntent: (intent || data.relationshipIntent || "long-term") as RelationshipIntent,
@@ -315,6 +393,7 @@ export default function VoiceOnboardingPage() {
       occupationPlace,
       occupationType,
       phone,
+      photoUrl,
       preference,
       profileId,
     ],
@@ -489,14 +568,7 @@ export default function VoiceOnboardingPage() {
             )}
           </div>
 
-          <div className="step-progress" aria-hidden="true">
-            {STEP_ORDER.map((id, idx) => (
-              <span
-                key={id}
-                data-state={idx < stepIndex ? "done" : idx === stepIndex ? "active" : "upcoming"}
-              />
-            ))}
-          </div>
+          <PhaseProgress currentStep={step} />
         </header>
 
         {error && (
@@ -785,6 +857,26 @@ export default function VoiceOnboardingPage() {
           </StepLayout>
         )}
 
+        {step === "photo" && (
+          <StepLayout
+            title="Add a profile photo"
+            description="One clear photo of you. We never share it with matches until you both opt in."
+            onContinue={goNext}
+            continueDisabled={false}
+            continueLabel={photoUrl ? "Continue" : "Skip for now"}
+            error={photoError ?? undefined}
+          >
+            <PhotoPicker
+              photoUrl={photoUrl}
+              onChange={(value) => {
+                setPhotoError(null);
+                setPhotoUrl(value);
+              }}
+              onError={(message) => setPhotoError(message)}
+            />
+          </StepLayout>
+        )}
+
         {step === "socials" && (
           <StepLayout
             title="Add your socials?"
@@ -883,6 +975,49 @@ export default function VoiceOnboardingPage() {
         )}
       </main>
     </PhoneShell>
+  );
+}
+
+function PhaseProgress({ currentStep }: { currentStep: StepId }) {
+  const segments = getPhaseProgress(currentStep);
+  const activePhase = segments.find((s) => s.state === "active")?.phase ?? PHASES[0];
+  const allDone = currentStep === "voice";
+
+  return (
+    <div className="space-y-2">
+      <div className="phase-progress" role="progressbar" aria-valuemin={0} aria-valuemax={3} aria-valuenow={segments.filter((s) => s.state === "done").length + (allDone ? 1 : 0)}>
+        {segments.map(({ phase, state, fillRatio }) => (
+          <div key={phase.id} className="phase-progress-segment" data-state={state}>
+            <span
+              className="phase-progress-fill"
+              style={state === "active" ? { width: `${fillRatio * 100}%` } : undefined}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.18em]">
+        {segments.map(({ phase, state }) => (
+          <span
+            key={phase.id}
+            className={
+              state === "done"
+                ? "text-white/82"
+                : state === "active"
+                  ? "text-white"
+                  : "text-white/30"
+            }
+          >
+            {state === "done" ? phase.doneLabel : state === "active" ? phase.inProgressLabel : phase.label}
+          </span>
+        ))}
+      </div>
+      <p
+        aria-live="polite"
+        className="text-xs text-white/52"
+      >
+        {allDone ? "🎉 You did it." : activePhase.id === "basics" ? "Quick basics — almost nothing to fill in." : activePhase.id === "vibe" ? "Now the fun stuff. Show your vibe." : "Time to meet your AI agent."}
+      </p>
+    </div>
   );
 }
 
