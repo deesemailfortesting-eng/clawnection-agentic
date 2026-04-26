@@ -202,7 +202,14 @@ export default function VoiceOnboardingPage() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [dob, setDob] = useState("");
+  // Default the DOB to the latest valid date — i.e. 18 years ago today — so
+  // the system date picker opens anchored at the age-18 boundary instead of
+  // today's date. Users scroll back from there to their actual birth year.
+  const [dob, setDob] = useState<string>(() => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() - 18);
+    return today.toISOString().slice(0, 10);
+  });
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
   const [occupationType, setOccupationType] = useState<"work" | "school" | "">("");
