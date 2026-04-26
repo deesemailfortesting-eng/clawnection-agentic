@@ -35,6 +35,7 @@ export default function VoiceOnboardingPage() {
   const vapiRef = useRef<Vapi | null>(null);
   const [isCallActive, setIsCallActive] = useState(false);
   const [profile, setProfile] = useState<ProfileData>({});
+  const profileRef = useRef<ProfileData>({});
   const [isComplete, setIsComplete] = useState(false);
   const [preCallData, setPreCallData] = useState({
     name: "",
@@ -44,49 +45,30 @@ export default function VoiceOnboardingPage() {
   const [showPreCallForm, setShowPreCallForm] = useState(true);
 
   useEffect(() => {
-    // Initialize Vapi
     const apiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
     if (!apiKey) {
       console.error("VAPI_API_KEY not found. Please set NEXT_PUBLIC_VAPI_API_KEY in your environment variables.");
       return;
     }
 
-    console.log("Initializing Vapi with API key:", apiKey.substring(0, 10) + "...");
-
-    console.log("Initializing Vapi with API key:", apiKey.substring(0, 10) + "...");
-
-    // Try setting API key globally if the SDK supports it
-    if (typeof window !== 'undefined' && (window as any).Vapi) {
-      (window as any).Vapi.apiKey = apiKey;
-    }
-
     vapiRef.current = new Vapi(apiKey);
-
-    console.log("Vapi initialized successfully:", !!vapiRef.current);
-
-    // Set up event listeners
     const vapi = vapiRef.current;
 
     vapi.on("call-start", () => {
-      console.log("Call started");
       setIsCallActive(true);
     });
 
     vapi.on("call-end", () => {
-      console.log("Call ended");
       setIsCallActive(false);
-      // Process the collected data and save profile
       processAndSaveProfile();
     });
 
     vapi.on("message", (message: any) => {
-      console.log("Received message:", message);
-      // Handle messages to extract profile data
       extractProfileData(message);
     });
 
     vapi.on("error", (error: any) => {
-      console.error("Vapi error details:", JSON.stringify(error, null, 2));
+      console.error("Vapi error:", JSON.stringify(error, null, 2));
       setIsCallActive(false);
     });
 
@@ -96,12 +78,13 @@ export default function VoiceOnboardingPage() {
   }, []);
 
   const extractProfileData = (message: any) => {
-    const text = message.text || "";
-    // Look for the JSON summary from the assistant
+    // VAPI transcript events use message.transcript, not message.text
+    const text = message.transcript || message.text || "";
     const jsonMatch = text.match(/PROFILE_DATA:\s*(\{.*\})/);
     if (jsonMatch) {
       try {
         const data = JSON.parse(jsonMatch[1]);
+        profileRef.current = data;
         setProfile(data);
       } catch (error) {
         console.error("Failed to parse profile data:", error);
@@ -110,35 +93,36 @@ export default function VoiceOnboardingPage() {
   };
 
   const processAndSaveProfile = () => {
-    // Validate and save the profile
-    if (profile.name && profile.age && profile.location && profile.bio) {
+    // Read from ref to avoid stale closure over profile state
+    const p = profileRef.current;
+    if (p.name && p.age && p.location && p.bio) {
       const romanticProfile: RomanticProfile = {
-        id: `voice-${profile.name.toLowerCase().replace(/\s+/g, "-")}`,
-        name: profile.name,
-        age: profile.age,
-        genderIdentity: profile.genderIdentity || "",
-        lookingFor: profile.lookingFor || "",
-        location: profile.location,
-        relationshipIntent: profile.relationshipIntent || "long-term",
-        bio: profile.bio,
-        interests: profile.interests || [],
-        values: profile.values || [],
-        communicationStyle: profile.communicationStyle || "balanced",
+        id: `voice-${p.name.toLowerCase().replace(/\s+/g, "-")}`,
+        name: p.name,
+        age: p.age,
+        genderIdentity: p.genderIdentity || "",
+        lookingFor: p.lookingFor || "",
+        location: p.location,
+        relationshipIntent: p.relationshipIntent || "long-term",
+        bio: p.bio,
+        interests: p.interests || [],
+        values: p.values || [],
+        communicationStyle: p.communicationStyle || "balanced",
         lifestyleHabits: {
-          sleepSchedule: profile.sleepSchedule || "flexible",
-          socialEnergy: profile.socialEnergy || "balanced",
-          activityLevel: profile.activityLevel || "active",
-          drinking: profile.drinking || "social",
-          smoking: profile.smoking || "never",
+          sleepSchedule: p.sleepSchedule || "flexible",
+          socialEnergy: p.socialEnergy || "balanced",
+          activityLevel: p.activityLevel || "active",
+          drinking: p.drinking || "social",
+          smoking: p.smoking || "never",
         },
-        dealbreakers: profile.dealbreakers || [],
-        idealFirstDate: profile.idealFirstDate || "",
+        dealbreakers: p.dealbreakers || [],
+        idealFirstDate: p.idealFirstDate || "",
         preferenceAgeRange: {
-          min: profile.preferenceMinAge || 24,
-          max: profile.preferenceMaxAge || 38,
+          min: p.preferenceMinAge || 24,
+          max: p.preferenceMaxAge || 38,
         },
-        preferenceNotes: profile.preferenceNotes || "",
-        agentType: profile.agentType || "hosted",
+        preferenceNotes: p.preferenceNotes || "",
+        agentType: p.agentType || "hosted",
       };
 
       saveProfile(romanticProfile);
@@ -179,7 +163,14 @@ export default function VoiceOnboardingPage() {
     try {
       const customFirstMessage = `Hey ${preCallData.name} — Clawnection here. I can see from what you shared that you identify as ${preCallData.gender} and your sexual preference is ${preCallData.sexualPreference}. Before we get going, just so you know what this is: we're gonna talk for however long feels right. After this, I spin up a version of you that goes and chats with other people's agents — and when yours genuinely clicks with someone, we set up a real meet. So this is just… you and me, for a bit. No form, no right answers. Where are you right now — like, physically, what room are you in?`;
 
-      await vapiRef.current.start(assistantId, { firstMessage: customFirstMessage });
+      await vapiRef.current.start(assistantId, {
+        firstMessage: customFirstMessage,
+        variableValues: {
+          name: preCallData.name,
+          gender: preCallData.gender,
+          sexualPreference: preCallData.sexualPreference,
+        },
+      });
       console.log("Vapi start successful");
       setShowPreCallForm(false);
     } catch (error) {
