@@ -7,34 +7,94 @@ import { AppHeader } from "@/components/AppHeader";
 import { PhoneShell } from "@/components/PhoneShell";
 import { sampleProfiles } from "@/lib/data/sampleProfiles";
 import { runVirtualDateSimulation } from "@/lib/matching/virtualDate";
-import { loadProfile, saveResult, syncResultToServer } from "@/lib/storage";
+import {
+  loadProfile,
+  loadProfileFromServer,
+  loadSignalsFromServer,
+  saveResult,
+  syncResultToServer,
+} from "@/lib/storage";
 import { RomanticProfile } from "@/lib/types/matching";
 
 export default function DemoPage() {
   const router = useRouter();
-  const [profile] = useState<RomanticProfile | null>(() => {
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<RomanticProfile | null>(() => {
     if (typeof window === "undefined") return null;
     return loadProfile();
   });
+  const [isRestoring, setIsRestoring] = useState(true);
   const [selectedId, setSelectedId] = useState(sampleProfiles[0].id);
 
   useEffect(() => {
-    if (!profile) {
+    document.title = "Run a virtual date · wtfradar";
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setProfileId(params.get("profileId"));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreSavedState() {
+      const cachedProfile = typeof window === "undefined" ? null : loadProfile();
+      const requestedProfileId = profileId ?? cachedProfile?.id ?? null;
+
+      if (cachedProfile) {
+        setProfile(cachedProfile);
+      }
+
+      if (!requestedProfileId) {
+        if (!cancelled) {
+          setIsRestoring(false);
+          router.replace("/onboarding");
+        }
+        return;
+      }
+
+      const [serverProfile] = await Promise.all([
+        loadProfileFromServer(requestedProfileId),
+        loadSignalsFromServer(requestedProfileId),
+      ]);
+
+      if (cancelled) return;
+
+      if (serverProfile) {
+        setProfile(serverProfile);
+        setIsRestoring(false);
+        return;
+      }
+
+      if (cachedProfile) {
+        setIsRestoring(false);
+        return;
+      }
+
+      setIsRestoring(false);
       router.replace("/onboarding");
     }
-  }, [profile, router]);
+
+    void restoreSavedState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, router]);
 
   const counterpart = useMemo(
     () => sampleProfiles.find((candidate) => candidate.id === selectedId) ?? sampleProfiles[0],
     [selectedId],
   );
 
-  function runSimulation() {
+  async function runSimulation() {
     if (!profile) return;
     const result = runVirtualDateSimulation(profile, counterpart);
     saveResult(result);
-    syncResultToServer(result);
-    router.push("/results");
+    const resultId = await syncResultToServer(result);
+    router.push(resultId ? `/results?resultId=${encodeURIComponent(resultId)}` : "/results");
   }
 
   return (
@@ -56,7 +116,9 @@ export default function DemoPage() {
           {profile ? (
             <ProfileCard profile={profile} title="You" subtitle="Loaded from this device" />
           ) : (
-            <p className="text-sm text-[var(--text-muted)]">Loading profile…</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              {isRestoring ? "Restoring saved state…" : "Loading profile…"}
+            </p>
           )}
         </section>
 
@@ -81,11 +143,11 @@ export default function DemoPage() {
           <ProfileCard profile={counterpart} title="Counterpart preview" compact />
           <button
             type="button"
-            onClick={runSimulation}
-            disabled={!profile}
+            onClick={() => void runSimulation()}
+            disabled={!profile || isRestoring}
             className="btn-primary w-full touch-target disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Run virtual introduction
+            {isRestoring ? "Restoring saved state…" : "Run virtual introduction"}
           </button>
         </section>
       </div>

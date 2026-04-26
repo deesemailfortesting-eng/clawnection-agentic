@@ -43,6 +43,106 @@ export type WhatsAppCoverageSummary = {
   warnings: string[];
 };
 
+export type WhatsAppResponseLatencyProfile = {
+  medianMinutesToReply: number;
+  p90MinutesToReply: number;
+  weekdayVsWeekendShift: number;
+  dayVsNightShift: number;
+  consistency: SignalConfidence;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppInitiationProfile = {
+  ownerInitiationRatio: number;
+  conversationRestartRatio: number;
+  followThroughRatio: number;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppMessageDepthProfile = {
+  averageOwnerMessageLength: number;
+  averageOtherMessageLength: number;
+  longMessageRatio: number;
+  questionAskingRatio: number;
+  threadDepthIndex: number;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppMirroringProfile = {
+  tempoMirroring: number;
+  lengthMirroring: number;
+  emojiMirroring: number;
+  punctuationMirroring: number;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppConflictStyleProfile = {
+  repairAfterTensionIndex: number;
+  escalationTendency: number;
+  avoidanceTendency: number;
+  directnessAfterConflict: number;
+  confidence: SignalConfidence;
+  sensitivityClass: SignalSensitivity;
+};
+
+export type WhatsAppExpressivenessProfile = {
+  emojiDensity: number;
+  punctuationIntensity: number;
+  emotionalVocabularyRange: number;
+  humorSignalStrength: number;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppCommunicationStyleProfile = {
+  derivedStyle: WhatsAppSignals["derivedCommunicationStyle"];
+  responseLatencyProfile: WhatsAppResponseLatencyProfile;
+  initiationProfile: WhatsAppInitiationProfile;
+  messageDepthProfile: WhatsAppMessageDepthProfile;
+  mirroringProfile: WhatsAppMirroringProfile;
+  conflictStyleProfile: WhatsAppConflictStyleProfile;
+  expressivenessProfile: WhatsAppExpressivenessProfile;
+};
+
+export type WhatsAppConsistencyProfile = {
+  responseConsistency: SignalConfidence;
+  initiationConsistency: SignalConfidence;
+  emotionalConsistency: SignalConfidence;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppRelationshipStabilityProfile = {
+  closeTieStabilityScore: number;
+  activeDaysPerWeek: number;
+  conversationLongevityDays: number;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppReengagementProfile = {
+  restartAfterGapRatio: number;
+  ownerReengagementShare: number;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppClosenessMaintenanceProfile = {
+  questionAskingRatio: number;
+  followUpRatio: number;
+  acknowledgmentRatio: number;
+  confidence: SignalConfidence;
+};
+
+export type WhatsAppAttachmentPatternProfile = {
+  consistencyProfile: WhatsAppConsistencyProfile;
+  relationshipStabilityProfile: WhatsAppRelationshipStabilityProfile;
+  reengagementProfile: WhatsAppReengagementProfile;
+  closenessMaintenanceProfile: WhatsAppClosenessMaintenanceProfile;
+};
+
+export type WhatsAppStabilityMetrics = {
+  responseConsistency: SignalConfidence;
+  relationshipStability: SignalConfidence;
+  coverageQuality: SignalConfidence;
+};
+
 export type WhatsAppConversationSignalProfile = {
   conversationId: string;
   participantCount: number;
@@ -55,21 +155,15 @@ export type WhatsAppConversationSignalProfile = {
     isSignalEligible: boolean;
     confidence: SignalConfidence;
   };
-  communicationStyle: {
-    derivedStyle: WhatsAppSignals["derivedCommunicationStyle"];
-    avgResponseLatencyMs: number;
-    initiationRatio: number;
-    longMessageRatio: number;
-    emojiDensity: number;
-  };
-  attachmentPattern: {
-    closeTieStabilityScore: number;
-    responseConsistency: SignalConfidence;
-  };
+  communicationStyle: WhatsAppCommunicationStyleProfile;
+  attachmentPattern: WhatsAppAttachmentPatternProfile;
   policyTags: SignalSensitivity[];
 };
 
 export type WhatsAppGlobalSignalProfile = {
+  communicationStyle: WhatsAppCommunicationStyleProfile;
+  attachmentPattern: WhatsAppAttachmentPatternProfile;
+  stabilityMetrics: WhatsAppStabilityMetrics;
   coverage: WhatsAppCoverageSummary;
   shareableSummaryCandidates: Array<{
     summaryKey: string;

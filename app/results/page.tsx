@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CompatibilityScore } from "@/components/CompatibilityScore";
+import { PhoneShell } from "@/components/PhoneShell";
 import { ProfileCard } from "@/components/ProfileCard";
 import { RecommendationBadge } from "@/components/RecommendationBadge";
 import { VirtualDateRoundCard } from "@/components/VirtualDateRoundCard";
 import { AppHeader } from "@/components/AppHeader";
-import { PhoneShell } from "@/components/PhoneShell";
-import { loadResult } from "@/lib/storage";
+import { loadResult, loadResultFromServer } from "@/lib/storage";
 import { MatchResult } from "@/lib/types/matching";
 
 function scoreNarration(score: number): string {
@@ -24,21 +24,63 @@ function scoreNarration(score: number): string {
 
 export default function ResultsPage() {
   const router = useRouter();
-  const [result] = useState<MatchResult | null>(() => {
+  const [resultId, setResultId] = useState<string | null>(null);
+  const [result, setResult] = useState<MatchResult | null>(() => {
     if (typeof window === "undefined") return null;
     return loadResult();
   });
+  const [isRestoring, setIsRestoring] = useState(true);
 
   useEffect(() => {
-    if (!result) {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    setResultId(params.get("resultId"));
+  }, []);
+
+  useEffect(() => {
+    document.title = "Virtual date results · wtfradar";
+
+    let cancelled = false;
+
+    async function restoreResult() {
+      const cachedResult = typeof window === "undefined" ? null : loadResult();
+
+      if (cachedResult) {
+        setResult(cachedResult);
+      }
+
+      if (resultId) {
+        const serverResult = await loadResultFromServer(resultId);
+        if (cancelled) return;
+        if (serverResult) {
+          setResult(serverResult);
+          setIsRestoring(false);
+          return;
+        }
+      }
+
+      if (cachedResult) {
+        setIsRestoring(false);
+        return;
+      }
+
+      setIsRestoring(false);
       router.replace("/demo");
     }
-  }, [result, router]);
+
+    void restoreResult();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resultId, router]);
 
   if (!result) {
     return (
       <PhoneShell label="Loading results">
-        <p className="py-12 text-center text-sm text-[var(--text-muted)]">Loading results…</p>
+        <p className="py-12 text-center text-sm text-[var(--text-muted)]">
+          {isRestoring ? "Loading results…" : "No results found."}
+        </p>
       </PhoneShell>
     );
   }
