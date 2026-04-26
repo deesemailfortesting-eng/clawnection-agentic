@@ -8,6 +8,9 @@ type ProfileCardProps = {
 };
 
 export function ProfileCard({ profile, title, subtitle, compact = false }: ProfileCardProps) {
+  const passions = profile.interestProfile?.passions.slice(0, 2).join(", ") ?? "";
+  const tags = profile.interestProfile?.tags.slice(0, 2).join(", ") ?? "";
+
   return (
     <article className="obsidian-card rounded-[28px] p-5">
       {title ? <p className="text-xs font-black uppercase tracking-[0.2em] text-white/44">{title}</p> : null}
@@ -24,6 +27,8 @@ export function ProfileCard({ profile, title, subtitle, compact = false }: Profi
           <p><span className="font-black text-white">Intent:</span> {profile.relationshipIntent}</p>
           <p><span className="font-black text-white">Values:</span> {profile.values.slice(0, 3).join(", ") || "Not added"}</p>
           <p><span className="font-black text-white">Interests:</span> {profile.interests.slice(0, 3).join(", ") || "Not added"}</p>
+          {passions ? <p><span className="font-black text-white">Passions:</span> {passions}</p> : null}
+          {tags ? <p><span className="font-black text-white">Tags:</span> {tags}</p> : null}
           <p><span className="font-black text-white">Location:</span> {profile.location}</p>
         </div>
       ) : null}

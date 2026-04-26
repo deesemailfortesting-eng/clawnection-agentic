@@ -46,4 +46,4 @@ Then a closing assessment synthesizes:
 - Start with a chat-first ingestion MVP before broadening data sources.
 - Treat consent and sensitive-inference boundaries as first-class design constraints.
 
-See `ARCHITECTURE.md` for the working system design notes.
+See `../architecture/ARCHITECTURE.md` for the working system design notes.

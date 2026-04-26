@@ -21,6 +21,12 @@ export type LifestyleHabits = {
   smoking: "never" | "occasionally" | "regular";
 };
 
+export type InterestProfile = {
+  core: string[];
+  passions: string[];
+  tags: string[];
+};
+
 export type RomanticProfile = {
   id: string;
   name: string;
@@ -31,6 +37,7 @@ export type RomanticProfile = {
   relationshipIntent: RelationshipIntent;
   bio: string;
   interests: string[];
+  interestProfile?: InterestProfile;
   values: string[];
   communicationStyle: CommunicationStyle;
   lifestyleHabits: LifestyleHabits;

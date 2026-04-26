@@ -268,7 +268,7 @@ export default function VoiceOnboardingPage() {
     // Persist to Cloudflare D1 in the background
     syncProfileToServer(romanticProfile);
     setIsComplete(true);
-    setTimeout(() => router.push("/demo"), 2000);
+    setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(romanticProfile.id)}`), 2000);
   }, [isComplete, router]);
 
   useEffect(() => {
