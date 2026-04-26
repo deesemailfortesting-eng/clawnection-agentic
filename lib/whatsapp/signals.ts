@@ -1,4 +1,11 @@
-import { ParsedMessage, WhatsAppSignals } from "@/lib/types/behavioral";
+import {
+  ParsedMessage,
+  SignalConfidence,
+  SignalSensitivity,
+  WhatsAppSignalExtractionMetadata,
+  WhatsAppSignalFamilyMetadata,
+  WhatsAppSignals,
+} from "@/lib/types/behavioral";
 
 const THREAD_GAP_MS = 4 * 60 * 60 * 1000; // 4 hours = new conversation thread
 const MAX_LATENCY_MS = 24 * 60 * 60 * 1000; // 24h cap to exclude offline gaps
@@ -6,6 +13,10 @@ const LOW_CONFIDENCE_THRESHOLD = 20;
 
 // Unicode emoji regex (requires u flag)
 const EMOJI_RE = /\p{Emoji_Presentation}/gu;
+
+type ExtractSignalOptions = {
+  extractionMetadata?: Partial<WhatsAppSignalExtractionMetadata>;
+};
 
 function mean(values: number[]): number {
   if (values.length === 0) return 0;
@@ -21,6 +32,74 @@ function stdDev(values: number[]): number {
 
 function normalizedSenderName(name: string): string {
   return name.trim().toLowerCase();
+}
+
+function getConfidence(userMessageCount: number): SignalConfidence {
+  if (userMessageCount < LOW_CONFIDENCE_THRESHOLD) return "low";
+  if (userMessageCount < 75) return "medium";
+  return "high";
+}
+
+function buildExtractionMetadata(
+  userMessageCount: number,
+  totalMessages: number,
+  metadata?: Partial<WhatsAppSignalExtractionMetadata>,
+): WhatsAppSignalExtractionMetadata {
+  return {
+    source: "whatsapp-export",
+    fileCount: metadata?.fileCount ?? 1,
+    parseErrors: metadata?.parseErrors ?? 0,
+    detectedFormats: metadata?.detectedFormats?.length ? metadata.detectedFormats : ["unknown"],
+  };
+}
+
+function buildFamilyMetadata(
+  userMessageCount: number,
+  totalMessages: number,
+  extractionMetadata: WhatsAppSignalExtractionMetadata,
+  sensitivity: SignalSensitivity,
+): WhatsAppSignalFamilyMetadata {
+  return {
+    confidence: getConfidence(userMessageCount),
+    sensitivity,
+    provenance: {
+      ...extractionMetadata,
+      userMessageCount,
+      totalMessages,
+    },
+  };
+}
+
+function getResponseSpeedLabel(avgResponseLatencyMs: number): string {
+  if (avgResponseLatencyMs === 0) return "insufficient response data";
+  if (avgResponseLatencyMs < 30 * 60 * 1000) return "typically replies quickly";
+  if (avgResponseLatencyMs < 3 * 60 * 60 * 1000) return "usually replies within a few hours";
+  return "often replies on a slower cadence";
+}
+
+function buildShareableSummary(signals: Pick<WhatsAppSignals,
+  "derivedCommunicationStyle" |
+  "activeHoursProfile" |
+  "avgResponseLatencyMs" |
+  "signalFamilyMetadata"
+>): WhatsAppSignals["shareableSummary"] {
+  return [
+    {
+      label: "Communication style",
+      value: signals.derivedCommunicationStyle,
+      confidence: signals.signalFamilyMetadata.communicationStyle.confidence,
+    },
+    {
+      label: "Active hours",
+      value: signals.activeHoursProfile,
+      confidence: signals.signalFamilyMetadata.activeHours.confidence,
+    },
+    {
+      label: "Reply cadence",
+      value: getResponseSpeedLabel(signals.avgResponseLatencyMs),
+      confidence: signals.signalFamilyMetadata.responsiveness.confidence,
+    },
+  ];
 }
 
 function computeResponseLatencies(messages: ParsedMessage[], userName: string): number[] {
@@ -241,7 +320,23 @@ export function mergeSignals(signalsList: WhatsAppSignals[]): WhatsAppSignals {
   const allEarliest = signalsList.map((s) => s.exportDateRange.earliest.getTime());
   const allLatest = signalsList.map((s) => s.exportDateRange.latest.getTime());
 
-  return {
+  const extractionMetadata: WhatsAppSignalExtractionMetadata = {
+    source: "whatsapp-export",
+    fileCount: signalsList.reduce((sum, s) => sum + s.extractionMetadata.fileCount, 0),
+    parseErrors: signalsList.reduce((sum, s) => sum + s.extractionMetadata.parseErrors, 0),
+    detectedFormats: [...new Set(signalsList.flatMap((s) => s.extractionMetadata.detectedFormats))],
+  };
+
+  const signalFamilyMetadata = {
+    communicationStyle: buildFamilyMetadata(totalUserMessages, signalsList.reduce((sum, s) => sum + s.totalMessages, 0), extractionMetadata, "shareable-summary"),
+    responsiveness: buildFamilyMetadata(totalUserMessages, signalsList.reduce((sum, s) => sum + s.totalMessages, 0), extractionMetadata, "shareable-summary"),
+    activeHours: buildFamilyMetadata(totalUserMessages, signalsList.reduce((sum, s) => sum + s.totalMessages, 0), extractionMetadata, "shareable-summary"),
+    relationshipPatterns: buildFamilyMetadata(totalUserMessages, signalsList.reduce((sum, s) => sum + s.totalMessages, 0), extractionMetadata, "private-only"),
+  };
+
+  const totalMessages = signalsList.reduce((sum, s) => sum + s.totalMessages, 0);
+
+  const mergedSignals: WhatsAppSignals = {
     avgResponseLatencyMs,
     responseLatencyStdDevMs,
     initiationRatio,
@@ -253,7 +348,7 @@ export function mergeSignals(signalsList: WhatsAppSignals[]): WhatsAppSignals {
     closeTieStabilityScore,
     activeHoursProfile,
     derivedCommunicationStyle,
-    totalMessages: signalsList.reduce((sum, s) => sum + s.totalMessages, 0),
+    totalMessages,
     userMessageCount: totalUserMessages,
     uniqueContacts: signalsList.reduce((sum, s) => sum + s.uniqueContacts, 0),
     isLowConfidence: totalUserMessages < LOW_CONFIDENCE_THRESHOLD,
@@ -262,10 +357,21 @@ export function mergeSignals(signalsList: WhatsAppSignals[]): WhatsAppSignals {
       latest: new Date(Math.max(...allLatest)),
     },
     analysedAt: new Date(),
+    extractionMetadata,
+    signalFamilyMetadata,
+    shareableSummary: [],
   };
+
+  mergedSignals.shareableSummary = buildShareableSummary(mergedSignals);
+
+  return mergedSignals;
 }
 
-export function extractSignals(messages: ParsedMessage[], userName: string): WhatsAppSignals {
+export function extractSignals(
+  messages: ParsedMessage[],
+  userName: string,
+  options?: ExtractSignalOptions,
+): WhatsAppSignals {
   const userNorm = normalizedSenderName(userName);
   const userMessages = messages.filter(
     (m) => !m.isSystem && normalizedSenderName(m.sender) === userNorm,
@@ -317,7 +423,21 @@ export function extractSignals(messages: ParsedMessage[], userName: string): Wha
   const earliest = timestamps.length ? new Date(Math.min(...timestamps)) : new Date();
   const latest = timestamps.length ? new Date(Math.max(...timestamps)) : new Date();
 
-  return {
+  const totalMessages = messages.filter((m) => !m.isSystem).length;
+  const extractionMetadata = buildExtractionMetadata(
+    userMessages.length,
+    totalMessages,
+    options?.extractionMetadata,
+  );
+
+  const signalFamilyMetadata = {
+    communicationStyle: buildFamilyMetadata(userMessages.length, totalMessages, extractionMetadata, "shareable-summary"),
+    responsiveness: buildFamilyMetadata(userMessages.length, totalMessages, extractionMetadata, "shareable-summary"),
+    activeHours: buildFamilyMetadata(userMessages.length, totalMessages, extractionMetadata, "shareable-summary"),
+    relationshipPatterns: buildFamilyMetadata(userMessages.length, totalMessages, extractionMetadata, "private-only"),
+  };
+
+  const signals: WhatsAppSignals = {
     avgResponseLatencyMs: avgLatencyMs,
     responseLatencyStdDevMs: stdDevLatencyMs,
     initiationRatio,
@@ -329,11 +449,18 @@ export function extractSignals(messages: ParsedMessage[], userName: string): Wha
     closeTieStabilityScore,
     activeHoursProfile,
     derivedCommunicationStyle,
-    totalMessages: messages.filter((m) => !m.isSystem).length,
+    totalMessages,
     userMessageCount: userMessages.length,
     uniqueContacts,
     isLowConfidence: userMessages.length < LOW_CONFIDENCE_THRESHOLD,
     exportDateRange: { earliest, latest },
     analysedAt: new Date(),
+    extractionMetadata,
+    signalFamilyMetadata,
+    shareableSummary: [],
   };
+
+  signals.shareableSummary = buildShareableSummary(signals);
+
+  return signals;
 }
