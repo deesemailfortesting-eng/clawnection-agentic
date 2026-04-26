@@ -14,7 +14,7 @@ export default function SignInPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    router.push("/onboarding");
+    router.push("/voice-onboarding");
   }
 
   return (
@@ -103,7 +103,7 @@ export default function SignInPage() {
               type="button"
               className="secondary-button w-full gap-3"
               aria-label="Sign in with Apple"
-              onClick={() => router.push("/onboarding")}
+              onClick={() => router.push("/voice-onboarding")}
             >
               <span aria-hidden="true" className="text-xl">Apple</span>
               <span>Sign in with Apple</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Vapi from "@vapi-ai/web";
@@ -32,8 +32,29 @@ type ProfileData = {
   agentType?: RomanticProfile["agentType"];
 };
 
-const fieldClass = "field mt-2 text-sm";
-const labelClass = "grid gap-1 text-sm font-bold text-white/84";
+type StepId = "welcome" | "name" | "gender" | "preference" | "voice";
+
+const STEP_ORDER: StepId[] = ["welcome", "name", "gender", "preference", "voice"];
+
+const genderOptions = [
+  { value: "woman", label: "Woman" },
+  { value: "man", label: "Man" },
+  { value: "non-binary", label: "Non-binary" },
+  { value: "other", label: "Something else" },
+  { value: "prefer-not-to-say", label: "Prefer not to say" },
+] as const;
+
+const preferenceOptions = [
+  { value: "straight", label: "Straight" },
+  { value: "gay", label: "Gay" },
+  { value: "lesbian", label: "Lesbian" },
+  { value: "bisexual", label: "Bisexual" },
+  { value: "pansexual", label: "Pansexual" },
+  { value: "queer", label: "Queer" },
+  { value: "asexual", label: "Asexual" },
+  { value: "prefer-not-to-say", label: "Prefer not to say" },
+] as const;
+
 const vapiApiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
 const vapiAssistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
 
@@ -47,25 +68,30 @@ export default function VoiceOnboardingPage() {
   const router = useRouter();
   const vapiRef = useRef<Vapi | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileRef = useRef<ProfileData>({});
+
+  const [step, setStep] = useState<StepId>("welcome");
+  const [name, setName] = useState("");
+  const [gender, setGender] = useState("");
+  const [preference, setPreference] = useState("");
+
   const [isCallActive, setIsCallActive] = useState(false);
-  const [profile, setProfile] = useState<ProfileData>({});
+  const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [profile, setProfile] = useState<ProfileData>({});
   const [error, setError] = useState<string | null>(() =>
     vapiApiKey ? null : "Voice onboarding is not configured. NEXT_PUBLIC_VAPI_API_KEY is missing.",
   );
-  const [preCallData, setPreCallData] = useState({
-    name: "",
-    gender: "",
-    sexualPreference: "",
-  });
-  const [showPreCallForm, setShowPreCallForm] = useState(true);
 
-  // Stable ref so processAndSaveProfile always sees latest profile state
-  const profileRef = useRef<ProfileData>({});
+  const stepIndex = useMemo(() => STEP_ORDER.indexOf(step), [step]);
 
   useEffect(() => {
     profileRef.current = profile;
   }, [profile]);
+
+  useEffect(() => {
+    document.title = "Onboarding · wtfradar";
+  }, []);
 
   const processAndSaveProfile = useCallback((data: ProfileData) => {
     if (!data.name || !data.age || !data.location || !data.bio) return;
@@ -74,7 +100,7 @@ export default function VoiceOnboardingPage() {
       id: `voice-${crypto.randomUUID()}`,
       name: data.name,
       age: data.age,
-      genderIdentity: data.genderIdentity || "",
+      genderIdentity: data.genderIdentity || gender,
       lookingFor: data.lookingFor || "",
       location: data.location,
       relationshipIntent: data.relationshipIntent || "long-term",
@@ -100,14 +126,12 @@ export default function VoiceOnboardingPage() {
     };
 
     saveProfile(romanticProfile);
-    // Persist to Cloudflare D1 in the background
     syncProfileToServer(romanticProfile);
     setIsComplete(true);
-    setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(romanticProfile.id)}`), 2000);
-  }, [router]);
+    setTimeout(() => router.push(`/demo?profileId=${encodeURIComponent(romanticProfile.id)}`), 1800);
+  }, [gender, router]);
 
   useEffect(() => {
-    document.title = "Voice onboarding · wtfradar";
     if (!vapiApiKey) return;
 
     vapiRef.current = new Vapi(vapiApiKey);
@@ -117,12 +141,16 @@ export default function VoiceOnboardingPage() {
 
     vapi.on("call-end", () => {
       setIsCallActive(false);
+      setIsAssistantSpeaking(false);
       if (callTimeoutRef.current) {
         clearTimeout(callTimeoutRef.current);
         callTimeoutRef.current = null;
       }
       processAndSaveProfile(profileRef.current);
     });
+
+    vapi.on("speech-start", () => setIsAssistantSpeaking(true));
+    vapi.on("speech-end", () => setIsAssistantSpeaking(false));
 
     vapi.on("message", (message: unknown) => {
       const text = messageText(message);
@@ -141,7 +169,8 @@ export default function VoiceOnboardingPage() {
     vapi.on("error", (err: unknown) => {
       console.error("Vapi error:", err);
       setIsCallActive(false);
-      setError("The voice call stopped unexpectedly. You can try again or use text onboarding.");
+      setIsAssistantSpeaking(false);
+      setError("The voice call stopped unexpectedly. Tap the orb to try again.");
     });
 
     return () => {
@@ -150,49 +179,86 @@ export default function VoiceOnboardingPage() {
     };
   }, [processAndSaveProfile]);
 
-  async function startVoiceOnboarding() {
+  function goNext() {
+    setError(null);
+    const next = STEP_ORDER[stepIndex + 1];
+    if (next) setStep(next);
+  }
+
+  function goBack() {
+    setError(null);
+    const prev = STEP_ORDER[stepIndex - 1];
+    if (prev) setStep(prev);
+  }
+
+  async function startVoiceCall() {
     if (!vapiRef.current) {
       setError("Voice onboarding is not initialized. Check NEXT_PUBLIC_VAPI_API_KEY.");
       return;
     }
-    if (!preCallData.name || !preCallData.gender || !preCallData.sexualPreference) {
-      setError("Please fill in all fields before starting the call.");
-      return;
-    }
-
     if (!vapiAssistantId) {
       setError("Voice onboarding is not configured. NEXT_PUBLIC_VAPI_ASSISTANT_ID is missing.");
       return;
     }
 
     setError(null);
-
-    // Auto-terminate after 30 minutes so microphone access cannot remain open indefinitely.
-    callTimeoutRef.current = setTimeout(() => { vapiRef.current?.stop(); }, 30 * 60 * 1000);
+    callTimeoutRef.current = setTimeout(() => {
+      vapiRef.current?.stop();
+    }, 30 * 60 * 1000);
 
     try {
-      const firstMessage = `Hey ${preCallData.name}. This is wtfradar. You shared that you identify as ${preCallData.gender} and your dating preference is ${preCallData.sexualPreference}. We will have a guided conversation to build your dating profile. After this, your agent can chat with other agents in a virtual date before you decide whether to meet someone. There are no right answers. To begin, where are you right now, like what room are you in?`;
+      const firstMessage = `Hey ${name}. This is wtfradar. You shared that you identify as ${gender} and your dating preference is ${preference}. We will have a guided conversation to build your dating profile. After this, your agent can chat with other agents in a virtual date before you decide whether to meet someone. There are no right answers. To begin, where are you right now, like what room are you in?`;
       await vapiRef.current.start(vapiAssistantId, { firstMessage });
-      setShowPreCallForm(false);
     } catch {
       if (callTimeoutRef.current) {
         clearTimeout(callTimeoutRef.current);
         callTimeoutRef.current = null;
       }
-      setError("Failed to start the call. Check your Vapi credentials.");
+      setError("Failed to start the call. Please try again.");
     }
   }
 
+  function endVoiceCall() {
+    vapiRef.current?.stop();
+  }
+
+  const continueDisabled =
+    (step === "name" && !name.trim()) ||
+    (step === "gender" && !gender) ||
+    (step === "preference" && !preference);
+
   return (
     <PhoneShell>
-      <main className="screen-padding space-y-6">
+      <main className="screen-padding flex min-h-dvh flex-col gap-8">
         <header className="space-y-4">
-          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
-          <p className="pill w-fit">Voice onboarding</p>
-          <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">Build your profile by voice</h1>
-          <p className="text-sm leading-6 text-white/66">
-            Talk with the wtfradar assistant to create your dating profile. Every spoken instruction is also summarized on this screen.
-          </p>
+          <div className="flex items-center justify-between">
+            {stepIndex > 0 && step !== "voice" && !isCallActive ? (
+              <button
+                type="button"
+                onClick={goBack}
+                className="text-sm font-bold text-white/68 hover:text-white"
+                aria-label="Go back to the previous step"
+              >
+                ← Back
+              </button>
+            ) : (
+              <Link href="/" className="text-sm font-bold text-white/58" aria-label="wtfradar home">
+                wtfradar
+              </Link>
+            )}
+            <span className="pill">
+              Step {stepIndex + 1} of {STEP_ORDER.length}
+            </span>
+          </div>
+
+          <div className="step-progress" aria-hidden="true">
+            {STEP_ORDER.map((id, idx) => (
+              <span
+                key={id}
+                data-state={idx < stepIndex ? "done" : idx === stepIndex ? "active" : "upcoming"}
+              />
+            ))}
+          </div>
         </header>
 
         {error && (
@@ -201,140 +267,202 @@ export default function VoiceOnboardingPage() {
           </div>
         )}
 
-        <section aria-labelledby="voice-status-title" className="obsidian-card rounded-[30px] p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 id="voice-status-title" className="text-xl font-black text-white">Microphone status</h2>
-              <p className="mt-1 text-sm leading-6 text-white/62">
-                {isCallActive ? "Your microphone is active for the onboarding call." : "Your microphone is off."}
-              </p>
-            </div>
-            <div
-              aria-hidden="true"
-              className={`mt-1 h-5 w-5 rounded-full ${isCallActive ? "animate-pulse bg-emerald-400 shadow-[0_0_26px_rgba(52,211,153,0.8)]" : "bg-white/18"}`}
-            />
-          </div>
-          <p role="status" aria-live="polite" className="mt-4 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-white">
-            {isCallActive ? "Microphone active. The assistant can hear you now." : "Microphone inactive. Start the call when you are ready."}
-          </p>
-        </section>
-
-        <section aria-labelledby="voice-flow-title" className="obsidian-card rounded-[30px] p-5">
-          {showPreCallForm && !isCallActive && !isComplete && (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <h2 id="voice-flow-title" className="text-xl font-black text-white">Before the call</h2>
-                <p className="text-sm leading-6 text-white/64">
-                  These details help the assistant start respectfully. You can end the call at any time.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <label className={labelClass}>
-                  What is your name?
-                  <input
-                    type="text"
-                    className={fieldClass}
-                    value={preCallData.name}
-                    onChange={(e) => setPreCallData((p) => ({ ...p, name: e.target.value }))}
-                    placeholder="Enter your name"
-                    required
-                  />
-                </label>
-
-                <label className={labelClass}>
-                  What is your gender?
-                  <select
-                    className={fieldClass}
-                    value={preCallData.gender}
-                    onChange={(e) => setPreCallData((p) => ({ ...p, gender: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select your gender</option>
-                    <option value="woman">Woman</option>
-                    <option value="man">Man</option>
-                    <option value="non-binary">Non-binary</option>
-                    <option value="other">Other</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
-                </label>
-
-                <label className={labelClass}>
-                  What is your dating preference?
-                  <select
-                    className={fieldClass}
-                    value={preCallData.sexualPreference}
-                    onChange={(e) => setPreCallData((p) => ({ ...p, sexualPreference: e.target.value }))}
-                    required
-                  >
-                    <option value="">Select your preference</option>
-                    <option value="straight">Straight</option>
-                    <option value="gay">Gay</option>
-                    <option value="lesbian">Lesbian</option>
-                    <option value="bisexual">Bisexual</option>
-                    <option value="pansexual">Pansexual</option>
-                    <option value="asexual">Asexual</option>
-                    <option value="queer">Queer</option>
-                    <option value="other">Other</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
-                </label>
-              </div>
-
-              <button
-                type="button"
-                onClick={startVoiceOnboarding}
-                disabled={!preCallData.name || !preCallData.gender || !preCallData.sexualPreference}
-                className="primary-button w-full"
-              >
-                Start voice onboarding
-              </button>
-
-              <p className="text-center text-xs leading-5 text-white/50">
-                Automatically ends after 30 minutes. You can end early at any time.
-              </p>
-            </div>
-          )}
-
-          {isCallActive && (
+        {step === "welcome" && (
+          <section className="flex flex-1 flex-col justify-between gap-8">
             <div className="space-y-5">
-              <div className="space-y-2">
-                <h2 id="voice-flow-title" className="text-xl font-black text-white">Call in progress</h2>
-                <p className="text-sm leading-6 text-white/66">
-                  Speak naturally. The assistant will ask about your location, values, interests, communication style, boundaries, and first-date preferences.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.05] p-4">
-                <h3 className="text-sm font-black text-white">Visual equivalent of the audio prompt</h3>
-                <p className="mt-2 text-sm leading-6 text-white/62">
-                  The assistant is guiding you through profile questions. If you miss a spoken prompt, ask it to repeat or summarize the question.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => vapiRef.current?.stop()}
-                className="secondary-button w-full"
-                aria-label="End voice onboarding call and turn off the microphone"
-              >
-                End call and turn off microphone
+              <p className="pill w-fit">Welcome</p>
+              <h1 className="text-5xl font-black leading-[0.95] tracking-[-0.05em] text-white">
+                Let&apos;s build your<br />wtf<span className="radar-text-gradient">radar</span> profile.
+              </h1>
+              <p className="text-base leading-7 text-white/70">
+                A few quick taps, then a short voice chat with your AI assistant. No long forms — your agent learns you naturally.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button type="button" onClick={goNext} className="primary-button w-full">
+                Get started
               </button>
+              <p className="text-center text-xs text-white/52">
+                Takes about a minute. End the voice call anytime.
+              </p>
             </div>
-          )}
+          </section>
+        )}
 
-          {isComplete && (
-            <div className="space-y-3 text-center">
-              <h2 id="voice-flow-title" className="text-xl font-black text-white">Profile saved</h2>
-              <p className="text-sm leading-6 text-white/66">Your profile is ready. Redirecting to the virtual date demo.</p>
+        {step === "name" && (
+          <section className="flex flex-1 flex-col justify-between gap-8">
+            <div className="space-y-5">
+              <p className="pill w-fit">A bit about you</p>
+              <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">
+                What should we call you?
+              </h1>
+              <label className="grid gap-2 text-sm font-bold text-white/84">
+                <span className="sr-only">Your first name</span>
+                <input
+                  className="field text-lg"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Enter your first name"
+                  autoFocus
+                  autoComplete="given-name"
+                />
+              </label>
             </div>
-          )}
-        </section>
 
-        <p className="text-center text-xs text-white/52">
-          Prefer to fill out the form manually?{" "}
-          <Link href="/onboarding" className="font-bold text-white underline underline-offset-4">
-            Open text onboarding
-          </Link>
-        </p>
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={continueDisabled}
+              className="primary-button w-full"
+            >
+              Continue
+            </button>
+          </section>
+        )}
+
+        {step === "gender" && (
+          <section className="flex flex-1 flex-col justify-between gap-8">
+            <div className="space-y-5">
+              <p className="pill w-fit">About you</p>
+              <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">
+                I am a...
+              </h1>
+              <p className="text-sm text-white/58">Pick the option that fits best — you can be more specific in the voice chat.</p>
+              <div className="grid gap-3">
+                {genderOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="option-tile"
+                    data-selected={gender === option.value}
+                    onClick={() => setGender(option.value)}
+                  >
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={continueDisabled}
+              className="primary-button w-full"
+            >
+              Continue
+            </button>
+          </section>
+        )}
+
+        {step === "preference" && (
+          <section className="flex flex-1 flex-col justify-between gap-8">
+            <div className="space-y-5">
+              <p className="pill w-fit">Who you&apos;re looking for</p>
+              <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">
+                I&apos;m attracted to...
+              </h1>
+              <p className="text-sm text-white/58">This helps your agent line up the right virtual dates.</p>
+              <div className="grid gap-3">
+                {preferenceOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="option-tile"
+                    data-selected={preference === option.value}
+                    onClick={() => setPreference(option.value)}
+                  >
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={continueDisabled}
+              className="primary-button w-full"
+            >
+              Continue
+            </button>
+          </section>
+        )}
+
+        {step === "voice" && (
+          <section className="flex flex-1 flex-col items-center justify-between gap-10 text-center">
+            <div className="space-y-3">
+              <p className="pill mx-auto w-fit">
+                {isComplete ? "All set" : isCallActive ? "Listening" : "Voice chat"}
+              </p>
+              <h1 className="text-4xl font-black leading-[1] tracking-[-0.04em] text-white">
+                {isComplete
+                  ? "Profile saved."
+                  : isCallActive
+                    ? "Just speak naturally."
+                    : `Ready, ${name || "friend"}?`}
+              </h1>
+              <p className="mx-auto max-w-[28ch] text-sm leading-6 text-white/66">
+                {isComplete
+                  ? "Heading to your virtual date demo…"
+                  : isCallActive
+                    ? "Your agent is listening. Tell it about your life, what you want, and what you avoid."
+                    : "Tap the orb to start a short voice intro. End anytime."}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={isCallActive ? endVoiceCall : startVoiceCall}
+              disabled={isComplete}
+              className="voice-orb"
+              data-active={isCallActive}
+              aria-label={isCallActive ? "End voice call" : "Start voice call"}
+            >
+              <span className="voice-orb-ring" aria-hidden="true" />
+              <span className="voice-orb-ring" aria-hidden="true" />
+              <span className="voice-orb-ring" aria-hidden="true" />
+              <span className="voice-orb-core" aria-hidden="true" />
+              <span className="sr-only">
+                {isCallActive ? "Voice call active. Tap to end." : "Tap to start voice call."}
+              </span>
+            </button>
+
+            <div className="w-full space-y-3">
+              <p
+                role="status"
+                aria-live="polite"
+                className="text-xs font-bold uppercase tracking-[0.18em] text-white/52"
+              >
+                {isCallActive
+                  ? isAssistantSpeaking
+                    ? "Assistant speaking"
+                    : "Microphone live"
+                  : isComplete
+                    ? "Saved"
+                    : "Tap orb to begin"}
+              </p>
+              {isCallActive && (
+                <button
+                  type="button"
+                  onClick={endVoiceCall}
+                  className="secondary-button w-full"
+                >
+                  End call
+                </button>
+              )}
+              {!isCallActive && !isComplete && (
+                <p className="text-center text-xs text-white/48">
+                  Auto-ends after 30 minutes. Prefer typing?{" "}
+                  <Link href="/onboarding" className="font-bold text-white underline underline-offset-4">
+                    Use the form
+                  </Link>
+                  .
+                </p>
+              )}
+            </div>
+          </section>
+        )}
       </main>
     </PhoneShell>
   );
