@@ -31,6 +31,61 @@ export type WhatsAppShareableSummary = {
   confidence: SignalConfidence;
 };
 
+export type WhatsAppCoverageSummary = {
+  conversationCount: number;
+  eligibleConversationCount: number;
+  messageCount: number;
+  ownerMessageCount: number;
+  otherMessageCount: number;
+  dateRangeStart: Date;
+  dateRangeEnd: Date;
+  coverageQuality: SignalConfidence;
+  warnings: string[];
+};
+
+export type WhatsAppConversationSignalProfile = {
+  conversationId: string;
+  participantCount: number;
+  inferredRelationshipType: "direct-message" | "group-chat";
+  coverage: {
+    messageCount: number;
+    ownerMessageCount: number;
+    otherMessageCount: number;
+    activeDays: number;
+    isSignalEligible: boolean;
+    confidence: SignalConfidence;
+  };
+  communicationStyle: {
+    derivedStyle: WhatsAppSignals["derivedCommunicationStyle"];
+    avgResponseLatencyMs: number;
+    initiationRatio: number;
+    longMessageRatio: number;
+    emojiDensity: number;
+  };
+  attachmentPattern: {
+    closeTieStabilityScore: number;
+    responseConsistency: SignalConfidence;
+  };
+  policyTags: SignalSensitivity[];
+};
+
+export type WhatsAppGlobalSignalProfile = {
+  coverage: WhatsAppCoverageSummary;
+  shareableSummaryCandidates: Array<{
+    summaryKey: string;
+    summaryText: string;
+    sourceSignalKeys: string[];
+    confidence: SignalConfidence;
+    approvedForAgentSharing: boolean;
+  }>;
+  privateOnlySignals: Array<{
+    signalKey: string;
+    value: string;
+    reason: string;
+    sensitivityClass: SignalSensitivity;
+  }>;
+};
+
 export type WhatsAppSignals = {
   // Raw computed signals
   avgResponseLatencyMs: number;
@@ -66,6 +121,9 @@ export type WhatsAppSignals = {
     relationshipPatterns: WhatsAppSignalFamilyMetadata;
   };
   shareableSummary: WhatsAppShareableSummary[];
+  coverageSummary: WhatsAppCoverageSummary;
+  conversationProfiles: WhatsAppConversationSignalProfile[];
+  globalProfile: WhatsAppGlobalSignalProfile;
 };
 
 export type SelfAwarenessGap = {

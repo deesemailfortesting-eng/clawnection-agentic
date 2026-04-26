@@ -105,6 +105,44 @@ export function loadSignals(): WhatsAppSignals | null {
       parsed.shareableSummary = [];
     }
 
+    if (!parsed.coverageSummary) {
+      parsed.coverageSummary = {
+        conversationCount: 0,
+        eligibleConversationCount: 0,
+        messageCount: parsed.totalMessages,
+        ownerMessageCount: parsed.userMessageCount,
+        otherMessageCount: Math.max(0, parsed.totalMessages - parsed.userMessageCount),
+        dateRangeStart: parsed.exportDateRange.earliest,
+        dateRangeEnd: parsed.exportDateRange.latest,
+        coverageQuality: parsed.isLowConfidence ? "low" : "medium",
+        warnings: [],
+      };
+    }
+
+    parsed.coverageSummary.dateRangeStart = new Date(parsed.coverageSummary.dateRangeStart);
+    parsed.coverageSummary.dateRangeEnd = new Date(parsed.coverageSummary.dateRangeEnd);
+
+    if (!parsed.conversationProfiles) {
+      parsed.conversationProfiles = [];
+    }
+
+    if (!parsed.globalProfile) {
+      parsed.globalProfile = {
+        coverage: parsed.coverageSummary,
+        shareableSummaryCandidates: parsed.shareableSummary.map((summary) => ({
+          summaryKey: summary.label.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+          summaryText: summary.value,
+          sourceSignalKeys: [summary.label],
+          confidence: summary.confidence,
+          approvedForAgentSharing: true,
+        })),
+        privateOnlySignals: [],
+      };
+    } else {
+      parsed.globalProfile.coverage.dateRangeStart = new Date(parsed.globalProfile.coverage.dateRangeStart);
+      parsed.globalProfile.coverage.dateRangeEnd = new Date(parsed.globalProfile.coverage.dateRangeEnd);
+    }
+
     return parsed;
   } catch {
     return null;
