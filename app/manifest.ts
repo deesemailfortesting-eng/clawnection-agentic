@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "AI-assisted dating with human control at every step.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0a0a0b",
-    theme_color: "#0a0a0b",
+    background_color: "#401625",
+    theme_color: "#401625",
     icons: [
       {
         src: "/icon",

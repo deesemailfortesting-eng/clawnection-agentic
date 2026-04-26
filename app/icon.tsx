@@ -13,11 +13,11 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0a0a0b",
+          background: "#401625",
           borderRadius: 8,
         }}
       >
-        <span style={{ color: "#fe3c72", fontSize: 18, fontWeight: 700 }}>W</span>
+        <span style={{ color: "#d982ab", fontSize: 18, fontWeight: 700 }}>W</span>
       </div>
     ),
     { ...size },

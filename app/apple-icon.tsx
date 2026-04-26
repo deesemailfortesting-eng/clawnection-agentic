@@ -14,12 +14,12 @@ export default function AppleIcon() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(145deg, #141416 0%, #0a0a0b 100%)",
+          background: "linear-gradient(145deg, #4a1f32 0%, #401625 100%)",
           borderRadius: 36,
         }}
       >
-        <span style={{ color: "#fe3c72", fontSize: 72, fontWeight: 800, letterSpacing: -2 }}>WTF</span>
-        <span style={{ color: "#a1a1aa", fontSize: 22, fontWeight: 600, marginTop: 4 }}>Radar</span>
+        <span style={{ color: "#d982ab", fontSize: 72, fontWeight: 800, letterSpacing: -2 }}>WTF</span>
+        <span style={{ color: "#f2c9dc", fontSize: 22, fontWeight: 600, marginTop: 4 }}>Radar</span>
       </div>
     ),
     { ...size },
