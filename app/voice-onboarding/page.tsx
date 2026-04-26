@@ -85,9 +85,11 @@ const onboardingAssistantOverrides = {
 } satisfies NonNullable<Parameters<Vapi["start"]>[1]>;
 
 function messageText(message: unknown): string {
-  if (typeof message !== "object" || message === null || !("text" in message)) return "";
-  const text = (message as { text?: unknown }).text;
-  return typeof text === "string" ? text : "";
+  if (typeof message !== "object" || message === null) return "";
+  const { text, transcript } = message as { text?: unknown; transcript?: unknown };
+  if (typeof transcript === "string") return transcript;
+  if (typeof text === "string") return text;
+  return "";
 }
 
 export default function VoiceOnboardingPage() {
