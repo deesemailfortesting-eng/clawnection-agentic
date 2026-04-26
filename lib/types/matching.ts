@@ -4,6 +4,7 @@ export type RelationshipIntent =
   | "long-term"
   | "serious-dating"
   | "exploring"
+  | "casual"
   | "friendship-first";
 
 export type CommunicationStyle =
@@ -27,13 +28,23 @@ export type InterestProfile = {
   tags: string[];
 };
 
+export type Occupation = {
+  type: "work" | "school";
+  place: string;
+};
+
 export type RomanticProfile = {
   id: string;
   name: string;
+  lastName?: string;
   age: number;
+  phoneNumber?: string;
   genderIdentity: string;
   lookingFor: string;
   location: string;
+  occupation?: Occupation;
+  instagram?: string;
+  linkedin?: string;
   relationshipIntent: RelationshipIntent;
   bio: string;
   interests: string[];
