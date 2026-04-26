@@ -6,6 +6,88 @@ export const LOCAL_RESULT_KEY = "clawnection.lastResult.v1";
 export const LOCAL_SIGNALS_KEY = "clawnection.signals.v1";
 const LOCAL_GAP_KEY = "clawnection.selfAwarenessGap.v1";
 
+function buildDefaultCommunicationStyleProfile(
+  signals: WhatsAppSignals,
+): WhatsAppSignals["conversationProfiles"][number]["communicationStyle"] {
+  return {
+    derivedStyle: signals.derivedCommunicationStyle,
+    responseLatencyProfile: {
+      medianMinutesToReply: Math.round(signals.avgResponseLatencyMs / 60_000),
+      p90MinutesToReply: Math.round((signals.avgResponseLatencyMs + signals.responseLatencyStdDevMs) / 60_000),
+      weekdayVsWeekendShift: 0,
+      dayVsNightShift: 0,
+      consistency: signals.isLowConfidence ? "low" : "medium",
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+    initiationProfile: {
+      ownerInitiationRatio: signals.initiationRatio,
+      conversationRestartRatio: signals.initiationRatio,
+      followThroughRatio: signals.initiationRatio,
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+    messageDepthProfile: {
+      averageOwnerMessageLength: signals.avgMessageLength,
+      averageOtherMessageLength: signals.avgMessageLength,
+      longMessageRatio: signals.longMessageRatio,
+      questionAskingRatio: signals.questionRatio,
+      threadDepthIndex: 0,
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+    mirroringProfile: {
+      tempoMirroring: 0,
+      lengthMirroring: 0,
+      emojiMirroring: 0,
+      punctuationMirroring: 0,
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+    conflictStyleProfile: {
+      repairAfterTensionIndex: 0,
+      escalationTendency: 0,
+      avoidanceTendency: 0,
+      directnessAfterConflict: 0,
+      confidence: signals.isLowConfidence ? "low" : "medium",
+      sensitivityClass: "private-only",
+    },
+    expressivenessProfile: {
+      emojiDensity: signals.emojiDensity,
+      punctuationIntensity: 0,
+      emotionalVocabularyRange: 0,
+      humorSignalStrength: 0,
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+  };
+}
+
+function buildDefaultAttachmentPatternProfile(
+  signals: WhatsAppSignals,
+): WhatsAppSignals["conversationProfiles"][number]["attachmentPattern"] {
+  return {
+    consistencyProfile: {
+      responseConsistency: signals.isLowConfidence ? "low" : "medium",
+      initiationConsistency: signals.isLowConfidence ? "low" : "medium",
+      emotionalConsistency: signals.isLowConfidence ? "low" : "medium",
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+    relationshipStabilityProfile: {
+      closeTieStabilityScore: signals.closeTieStabilityScore,
+      activeDaysPerWeek: 0,
+      conversationLongevityDays: 0,
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+    reengagementProfile: {
+      restartAfterGapRatio: signals.initiationRatio,
+      ownerReengagementShare: signals.initiationRatio,
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+    closenessMaintenanceProfile: {
+      questionAskingRatio: signals.questionRatio,
+      followUpRatio: signals.questionRatio,
+      acknowledgmentRatio: 0,
+      confidence: signals.isLowConfidence ? "low" : "medium",
+    },
+  };
+}
+
 export function saveProfile(profile: RomanticProfile) {
   localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(profile));
 }
@@ -124,10 +206,29 @@ export function loadSignals(): WhatsAppSignals | null {
 
     if (!parsed.conversationProfiles) {
       parsed.conversationProfiles = [];
+    } else {
+      parsed.conversationProfiles = parsed.conversationProfiles.map((profile) => ({
+        ...profile,
+        communicationStyle: {
+          ...buildDefaultCommunicationStyleProfile(parsed),
+          ...profile.communicationStyle,
+        },
+        attachmentPattern: {
+          ...buildDefaultAttachmentPatternProfile(parsed),
+          ...profile.attachmentPattern,
+        },
+      }));
     }
 
     if (!parsed.globalProfile) {
       parsed.globalProfile = {
+        communicationStyle: buildDefaultCommunicationStyleProfile(parsed),
+        attachmentPattern: buildDefaultAttachmentPatternProfile(parsed),
+        stabilityMetrics: {
+          responseConsistency: parsed.isLowConfidence ? "low" : "medium",
+          relationshipStability: parsed.isLowConfidence ? "low" : "medium",
+          coverageQuality: parsed.coverageSummary.coverageQuality,
+        },
         coverage: parsed.coverageSummary,
         shareableSummaryCandidates: parsed.shareableSummary.map((summary) => ({
           summaryKey: summary.label.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
@@ -139,6 +240,26 @@ export function loadSignals(): WhatsAppSignals | null {
         privateOnlySignals: [],
       };
     } else {
+      parsed.globalProfile.communicationStyle = {
+        ...buildDefaultCommunicationStyleProfile(parsed),
+        ...parsed.globalProfile.communicationStyle,
+      };
+      parsed.globalProfile.attachmentPattern = {
+        ...buildDefaultAttachmentPatternProfile(parsed),
+        ...parsed.globalProfile.attachmentPattern,
+      };
+      parsed.globalProfile.stabilityMetrics = {
+        ...parsed.globalProfile.stabilityMetrics,
+        responseConsistency:
+          parsed.globalProfile.stabilityMetrics?.responseConsistency ??
+          (parsed.isLowConfidence ? "low" : "medium"),
+        relationshipStability:
+          parsed.globalProfile.stabilityMetrics?.relationshipStability ??
+          (parsed.isLowConfidence ? "low" : "medium"),
+        coverageQuality:
+          parsed.globalProfile.stabilityMetrics?.coverageQuality ??
+          parsed.coverageSummary.coverageQuality,
+      };
       parsed.globalProfile.coverage.dateRangeStart = new Date(parsed.globalProfile.coverage.dateRangeStart);
       parsed.globalProfile.coverage.dateRangeEnd = new Date(parsed.globalProfile.coverage.dateRangeEnd);
     }
