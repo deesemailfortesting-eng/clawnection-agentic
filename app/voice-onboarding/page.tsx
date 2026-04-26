@@ -45,9 +45,8 @@ type ProfileData = {
 
 type StepId =
   | "welcome"
-  | "firstName"
-  | "lastName"
-  | "age"
+  | "name"
+  | "dob"
   | "phone"
   | "location"
   | "occupationType"
@@ -60,9 +59,8 @@ type StepId =
 
 const STEP_ORDER: StepId[] = [
   "welcome",
-  "firstName",
-  "lastName",
-  "age",
+  "name",
+  "dob",
   "phone",
   "location",
   "occupationType",
@@ -73,6 +71,37 @@ const STEP_ORDER: StepId[] = [
   "socials",
   "voice",
 ];
+
+const MONTH_OPTIONS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+function daysInMonth(month: number, year: number): number {
+  if (!month || !year) return 31;
+  return new Date(year, month, 0).getDate();
+}
+
+function computeAgeFromDob(year: number, month: number, day: number): number {
+  if (!year || !month || !day) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  const beforeBirthdayThisYear =
+    today.getMonth() + 1 < month ||
+    (today.getMonth() + 1 === month && today.getDate() < day);
+  if (beforeBirthdayThisYear) age -= 1;
+  return age;
+}
 
 const genderOptions = [
   { value: "woman", label: "Woman" },
@@ -144,7 +173,9 @@ export default function VoiceOnboardingPage() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [age, setAge] = useState("");
+  const [dobMonth, setDobMonth] = useState<number | "">("");
+  const [dobDay, setDobDay] = useState<number | "">("");
+  const [dobYear, setDobYear] = useState<number | "">("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
   const [occupationType, setOccupationType] = useState<"work" | "school" | "">("");
@@ -173,10 +204,26 @@ export default function VoiceOnboardingPage() {
     document.title = "Onboarding · wtfradar";
   }, []);
 
-  const ageNumber = Number(age);
-  const ageIsValid = !Number.isNaN(ageNumber) && ageNumber >= 18 && ageNumber <= 120;
+  const dobIsComplete =
+    typeof dobMonth === "number" && typeof dobDay === "number" && typeof dobYear === "number";
+  const ageNumber = dobIsComplete
+    ? computeAgeFromDob(dobYear as number, dobMonth as number, dobDay as number)
+    : 0;
+  const ageIsValid = ageNumber >= 18 && ageNumber <= 120;
   const phoneDigitsOnly = phone.replace(/\D/g, "");
   const phoneIsValid = phoneDigitsOnly.length >= 7 && phoneDigitsOnly.length <= 15;
+  const currentYear = new Date().getFullYear();
+  const dobYearMax = currentYear - 18;
+  const dobYearMin = currentYear - 100;
+  const yearOptions = useMemo(() => {
+    const years: number[] = [];
+    for (let y = dobYearMax; y >= dobYearMin; y -= 1) years.push(y);
+    return years;
+  }, [dobYearMax, dobYearMin]);
+  const dayOptionsCount =
+    typeof dobMonth === "number" && typeof dobYear === "number"
+      ? daysInMonth(dobMonth, dobYear)
+      : 31;
 
   const processAndSaveProfile = useCallback(
     (data: ProfileData) => {
@@ -334,7 +381,7 @@ export default function VoiceOnboardingPage() {
             ? `they study${occupationPlace ? ` at ${occupationPlace}` : ""}`
             : "";
       const intentLabel = intentOptions.find((o) => o.value === intent)?.label.toLowerCase() ?? "long-term";
-      const firstMessage = `Hey ${firstName}. This is wtfradar. You said you're ${age}, based in ${location}${occupationDetail ? `, and ${occupationDetail}` : ""}. You identify as ${gender}, you're interested in ${preference}, and you're here for ${intentLabel}. We'll have a guided conversation to round out your dating profile. There are no right answers. To begin — what does an amazing first date look like for you?`;
+      const firstMessage = `Hey ${firstName}. This is wtfradar. You said you're ${ageNumber}, based in ${location}${occupationDetail ? `, and ${occupationDetail}` : ""}. You identify as ${gender}, you're interested in ${preference}, and you're here for ${intentLabel}. We'll have a guided conversation to round out your dating profile. There are no right answers. To begin — what does an amazing first date look like for you?`;
       await vapiRef.current.start(vapiAssistantId, { firstMessage });
     } catch {
       if (callTimeoutRef.current) {
@@ -350,9 +397,8 @@ export default function VoiceOnboardingPage() {
   }
 
   const continueDisabled =
-    (step === "firstName" && !firstName.trim()) ||
-    (step === "lastName" && !lastName.trim()) ||
-    (step === "age" && !ageIsValid) ||
+    (step === "name" && (!firstName.trim() || !lastName.trim())) ||
+    (step === "dob" && !ageIsValid) ||
     (step === "phone" && !phoneIsValid) ||
     (step === "location" && !location.trim()) ||
     (step === "occupationType" && !occupationType) ||
@@ -424,64 +470,110 @@ export default function VoiceOnboardingPage() {
           </section>
         )}
 
-        {step === "firstName" && (
+        {step === "name" && (
           <StepLayout
             pill="A bit about you"
-            title="What's your first name?"
-            onContinue={goNext}
-            continueDisabled={continueDisabled}
-          >
-            <input
-              className="field text-lg"
-              value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
-              placeholder="First name"
-              autoFocus
-              autoComplete="given-name"
-              aria-label="First name"
-            />
-          </StepLayout>
-        )}
-
-        {step === "lastName" && (
-          <StepLayout
-            pill="A bit about you"
-            title={`Nice, ${firstName.trim() || "friend"}. And your last name?`}
+            title="What's your name?"
             description="Last names stay private until you and a match both agree to share."
             onContinue={goNext}
             continueDisabled={continueDisabled}
           >
-            <input
-              className="field text-lg"
-              value={lastName}
-              onChange={(event) => setLastName(event.target.value)}
-              placeholder="Last name"
-              autoFocus
-              autoComplete="family-name"
-              aria-label="Last name"
-            />
+            <label className="grid gap-1 text-sm font-bold text-white/84">
+              <span className="text-xs uppercase tracking-[0.18em] text-white/52">First name</span>
+              <input
+                className="field text-lg"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+                placeholder="First name"
+                autoFocus
+                autoComplete="given-name"
+                aria-label="First name"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-bold text-white/84">
+              <span className="text-xs uppercase tracking-[0.18em] text-white/52">Last name</span>
+              <input
+                className="field text-lg"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+                placeholder="Last name"
+                autoComplete="family-name"
+                aria-label="Last name"
+              />
+            </label>
           </StepLayout>
         )}
 
-        {step === "age" && (
+        {step === "dob" && (
           <StepLayout
             pill="A bit about you"
-            title="How old are you?"
-            description="You must be 18 or older to use wtfradar."
+            title="When's your birthday?"
+            description="You must be 18 or older to use wtfradar. We only show your age, not your full birthday."
             onContinue={goNext}
             continueDisabled={continueDisabled}
-            error={age && !ageIsValid ? "You must be 18 or older to continue." : undefined}
+            error={dobIsComplete && !ageIsValid ? "You must be 18 or older to continue." : undefined}
           >
-            <input
-              className="field text-lg"
-              value={age}
-              onChange={(event) => setAge(event.target.value.replace(/[^\d]/g, "").slice(0, 3))}
-              placeholder="Age"
-              inputMode="numeric"
-              autoFocus
-              autoComplete="off"
-              aria-label="Age"
-            />
+            <div className="grid grid-cols-[1.4fr_0.9fr_1.1fr] gap-2">
+              <label className="grid gap-1 text-sm font-bold text-white/84">
+                <span className="text-xs uppercase tracking-[0.18em] text-white/52">Month</span>
+                <select
+                  className="field"
+                  value={dobMonth === "" ? "" : String(dobMonth)}
+                  onChange={(event) =>
+                    setDobMonth(event.target.value ? Number(event.target.value) : "")
+                  }
+                  aria-label="Birth month"
+                >
+                  <option value="">Month</option>
+                  {MONTH_OPTIONS.map((label, idx) => (
+                    <option key={label} value={idx + 1}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-bold text-white/84">
+                <span className="text-xs uppercase tracking-[0.18em] text-white/52">Day</span>
+                <select
+                  className="field"
+                  value={dobDay === "" ? "" : String(dobDay)}
+                  onChange={(event) =>
+                    setDobDay(event.target.value ? Number(event.target.value) : "")
+                  }
+                  aria-label="Birth day"
+                >
+                  <option value="">Day</option>
+                  {Array.from({ length: dayOptionsCount }, (_, idx) => idx + 1).map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm font-bold text-white/84">
+                <span className="text-xs uppercase tracking-[0.18em] text-white/52">Year</span>
+                <select
+                  className="field"
+                  value={dobYear === "" ? "" : String(dobYear)}
+                  onChange={(event) =>
+                    setDobYear(event.target.value ? Number(event.target.value) : "")
+                  }
+                  aria-label="Birth year"
+                >
+                  <option value="">Year</option>
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {ageIsValid ? (
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/52">
+                You&apos;ll be shown as {ageNumber}
+              </p>
+            ) : null}
           </StepLayout>
         )}
 
