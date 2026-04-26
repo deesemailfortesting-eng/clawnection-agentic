@@ -433,6 +433,64 @@ select.field option {
   }
 }
 
+/*
+ * Sign in with Apple button — follows Apple's Human Interface Guidelines.
+ *   https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple
+ * Uses max corner radius (pill, equal to half the button height), the system
+ * font, the official Apple logo glyph, a 44pt minimum height, and the standard
+ * black/white treatment with no additional decoration.
+ */
+.apple-sign-in-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 9999px;
+  border: none;
+  padding: 0 24px;
+  background: #000000;
+  color: #ffffff;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "SF Pro",
+    "Helvetica Neue",
+    Helvetica,
+    Arial,
+    sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-font-smoothing: antialiased;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.apple-sign-in-button:hover {
+  opacity: 0.92;
+}
+
+.apple-sign-in-button:active {
+  transform: scale(0.99);
+  opacity: 0.85;
+}
+
+.apple-sign-in-button:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.85);
+  outline-offset: 3px;
+}
+
+.apple-sign-in-button .apple-glyph {
+  width: 16px;
+  height: 18px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
 .option-tile {
   display: flex;
   align-items: center;
