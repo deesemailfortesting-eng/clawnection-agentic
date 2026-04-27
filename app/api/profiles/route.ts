@@ -83,7 +83,14 @@ export async function GET(req: NextRequest) {
   const db = (env as unknown as CloudflareEnv).DB;
   const id = req.nextUrl.searchParams.get("id");
 
-  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+  if (!id) {
+    const { results } = await db
+      .prepare("SELECT * FROM profiles ORDER BY created_at DESC LIMIT 20")
+      .all();
+
+    const profiles = (results ?? []).map((row: Record<string, unknown>) => rowToProfile(row));
+    return NextResponse.json({ profiles });
+  }
 
   const row = await db.prepare("SELECT * FROM profiles WHERE id = ?").bind(id).first();
   if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });

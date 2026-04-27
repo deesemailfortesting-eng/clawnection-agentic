@@ -22,6 +22,9 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "SCORING_WEIGHTS": "{\"baseScore\":50,\"sharedInterestPoints\":6,\"sharedInterestMax\":18,\"sharedValuePoints\":8,\"sharedValueMax\":24,\"intentMatchBonus\":12,\"intentMismatchPenalty\":8,\"commStyleMatchBonus\":8,\"commStyleMismatchPenalty\":4,\"locationBonus\":6,\"ageFitBonus\":6,\"ageMismatchPenalty\":10,\"smokingDealbreaker\":18,\"generalDealbreaker\":12,\"latencyFastBonus\":3,\"latencySlowBonus\":3,\"inconsistentPenalty\":3}"
+  },
   "d1_databases": [
     {
       "binding": "DB",
