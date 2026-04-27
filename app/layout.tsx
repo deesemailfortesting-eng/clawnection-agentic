@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { AuthProvider } from "@/lib/auth/AuthProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -47,9 +46,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://use.typekit.net/qly1tpd.css" />
       </head>
-      <body className="min-h-full bg-background font-sans text-foreground">
-        <AuthProvider>{children}</AuthProvider>
-      </body>
+      <body className="min-h-full bg-background font-sans text-foreground">{children}</body>
     </html>
   );
 }
