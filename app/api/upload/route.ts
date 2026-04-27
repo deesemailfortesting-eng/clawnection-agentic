@@ -6,7 +6,6 @@ import { parseFBMessengerExport } from "@/lib/messenger/parser";
 import { extractSignals, mergeSignals } from "@/lib/whatsapp/signals";
 import { WhatsAppSignals } from "@/lib/types/behavioral";
 
-export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {

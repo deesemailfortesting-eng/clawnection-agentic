@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { SelfAwarenessGap } from "@/lib/types/behavioral";
+import type { SelfAwarenessGap } from "@/lib/types/behavioral";
 
-export const runtime = "edge";
 
 // Internal-only: gap data is never surfaced in UI
 export async function POST(req: NextRequest) {

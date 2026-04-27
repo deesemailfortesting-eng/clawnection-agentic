@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { MatchResult } from "@/lib/types/matching";
+import type { MatchResult } from "@/lib/types/matching";
 
-export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   const { env } = getCloudflareContext();

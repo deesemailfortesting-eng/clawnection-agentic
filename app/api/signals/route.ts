@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { WhatsAppSignals } from "@/lib/types/behavioral";
+import type { WhatsAppSignals } from "@/lib/types/behavioral";
 
-export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   const { env } = getCloudflareContext();

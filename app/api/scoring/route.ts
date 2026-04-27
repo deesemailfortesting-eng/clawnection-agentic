@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { RomanticProfile } from "@/lib/types/matching";
-import { WhatsAppSignals } from "@/lib/types/behavioral";
+import type { RomanticProfile } from "@/lib/types/matching";
+import type { WhatsAppSignals } from "@/lib/types/behavioral";
 import {
   scoreProfiles,
   buildRecommendation,
   suggestFirstDate,
   DEFAULT_WEIGHTS,
-  ScoringWeights,
 } from "@/lib/matching/scoring";
+import type { ScoringWeights } from "@/lib/matching/scoring";
 
-export const runtime = "edge";
 
 function rowToProfile(row: Record<string, unknown>): RomanticProfile {
   return {
