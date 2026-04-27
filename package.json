@@ -15,7 +15,6 @@
   "dependencies": {
     "@vapi-ai/web": "^2.5.2",
     "@opennextjs/cloudflare": "^1.19.4",
-    "@vapi-ai/web": "^2.5.2",
     "jszip": "^3.10.1",
     "next": "16.2.3",
     "react": "19.2.4",
