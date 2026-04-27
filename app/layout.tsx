@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,6 +21,19 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "wtfradar",
   },
+  openGraph: {
+    title: "WTF Radar",
+    description: "AI-assisted dating with human control at every step.",
+    type: "website",
+    siteName: "WTF Radar",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#401625",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

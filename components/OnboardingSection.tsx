@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useId } from "react";
 
 export function OnboardingSection({
   title,
@@ -9,13 +9,16 @@ export function OnboardingSection({
   description: string;
   children: ReactNode;
 }) {
-  const headingId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-title`;
+  const baseId = useId();
+  const headingId = `${baseId}-heading`;
 
   return (
-    <section aria-labelledby={headingId} className="obsidian-card rounded-[28px] p-5">
-      <h2 id={headingId} className="text-xl font-black tracking-tight text-white">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-white/62">{description}</p>
-      <div className="mt-4 grid gap-4">{children}</div>
+    <section className="card-obsidian space-y-3" aria-labelledby={headingId}>
+      <h2 id={headingId} className="text-base font-semibold text-[var(--text-primary)]">
+        {title}
+      </h2>
+      <p className="text-sm leading-relaxed text-[var(--text-secondary)]">{description}</p>
+      <div className="grid gap-4 pt-1">{children}</div>
     </section>
   );
 }
