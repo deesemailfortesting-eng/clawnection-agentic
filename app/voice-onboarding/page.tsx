@@ -233,8 +233,8 @@ const occupationTypeOptions = [
   { value: "school" as const, label: "I'm in school", blurb: "Where do you study?" },
 ];
 
-const vapiApiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY;
-const vapiAssistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID;
+const vapiApiKey = process.env.NEXT_PUBLIC_VAPI_API_KEY || "9058d621-d733-4b05-b4b0-c6e2a8ed549b";
+const vapiAssistantId = process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID || "d1f8ed5a-69dd-45b4-8d1b-641df6d15051";
 
 function messageText(message: unknown): string {
   if (typeof message !== "object" || message === null || !("text" in message)) return "";
