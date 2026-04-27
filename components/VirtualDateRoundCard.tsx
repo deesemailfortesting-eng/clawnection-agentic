@@ -1,9 +1,9 @@
 import { VirtualDateRound } from "@/lib/types/matching";
 
 const signalStyles = {
-  positive: "border-emerald-300/30 bg-emerald-400/15 text-emerald-100",
-  mixed: "border-amber-300/30 bg-amber-400/15 text-amber-100",
-  caution: "border-red-300/30 bg-red-400/15 text-red-100",
+  positive: "border-[rgba(216,191,65,0.36)] bg-[rgba(216,191,65,0.14)] text-[var(--color-text-primary)]",
+  mixed: "border-[rgba(216,130,170,0.34)] bg-[rgba(216,130,170,0.14)] text-[var(--color-text-primary)]",
+  caution: "border-[rgba(142,87,165,0.42)] bg-[rgba(142,87,165,0.18)] text-[var(--color-text-primary)]",
 } as const;
 
 export function VirtualDateRoundCard({ round }: { round: VirtualDateRound }) {

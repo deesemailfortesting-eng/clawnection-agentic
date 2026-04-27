@@ -30,9 +30,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <head>
-        <link rel="stylesheet" href="https://use.typekit.net/qly1tpd.css" />
-      </head>
       <body className="min-h-full bg-background font-sans text-foreground">{children}</body>
     </html>
   );
