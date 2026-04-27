@@ -77,17 +77,13 @@ export default function PersonaPage() {
         const result = await fetchPersona(profileId!);
         if (cancelled) return;
 
-        if (result && !result.analysis_skipped) {
+        if (result) {
           setPersona(result);
           return;
         }
 
         if (attempt >= MAX_POLLS) {
-          if (result) {
-            setPersona(result);
-          } else {
-            setTimedOut(true);
-          }
+          setTimedOut(true);
           return;
         }
 
@@ -182,6 +178,14 @@ export default function PersonaPage() {
                 <ul className="space-y-2">
                   {renderVoiceSamples(persona.voice_samples)}
                 </ul>
+              </section>
+            )}
+
+            {!persona.portrait && persona.transcript && (
+              <section aria-labelledby="transcript-title" className="obsidian-card rounded-[28px] p-5 space-y-3">
+                <h2 id="transcript-title" className="text-lg font-black text-white">Call transcript</h2>
+                <p className="text-xs text-white/44 mb-2">AI analysis not configured — showing raw transcript.</p>
+                <pre className="text-sm leading-6 text-white/72 whitespace-pre-wrap font-sans">{persona.transcript}</pre>
               </section>
             )}
 

@@ -29,6 +29,44 @@ function extractPersona(message: Record<string, unknown>): Record<string, string
   return persona ?? null;
 }
 
+// When Vapi's structured analysis isn't configured, pull the user's own words
+// straight from the transcript as a best-effort portrait + voice samples.
+function buildFallbackPersona(transcript: string): { portrait: string; voice_samples: string } {
+  if (!transcript.trim()) return { portrait: "", voice_samples: "" };
+
+  const lines = transcript.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const userLines: string[] = [];
+  let capturing = false;
+
+  for (const line of lines) {
+    // Vapi transcripts label turns as "User", "AI", "Assistant" (with optional timestamp)
+    if (/^(User|Human|Customer)\b/i.test(line)) {
+      capturing = true;
+      const text = line.replace(/^[^:]+:\s*/, "").trim();
+      if (text.length > 15) userLines.push(text);
+    } else if (/^(AI|Assistant|Bot|Agent)\b/i.test(line)) {
+      capturing = false;
+    } else if (capturing && line.length > 15) {
+      // continuation of a user turn (some formats wrap onto next line)
+      userLines.push(line);
+    }
+  }
+
+  if (userLines.length === 0) {
+    // Transcript exists but roles aren't labelled — use the raw text as portrait
+    return { portrait: transcript.slice(0, 600), voice_samples: "" };
+  }
+
+  const portrait = userLines.slice(0, 5).join(" ").slice(0, 700);
+  const voice_samples = userLines
+    .filter(l => l.length > 30)
+    .slice(0, 5)
+    .map((l, i) => `${i + 1}. ${l}`)
+    .join("\n");
+
+  return { portrait, voice_samples };
+}
+
 export async function POST(req: NextRequest) {
   const { env } = getCloudflareContext();
   const db = (env as unknown as CloudflareEnv).DB;
@@ -74,11 +112,12 @@ export async function POST(req: NextRequest) {
   const endedReason = (message.endedReason ?? call.endedReason ?? null) as string | null;
 
   const persona = extractPersona(message);
-  const analysisSkipped = persona === null ? 1 : 0;
+  const fallback = !persona && transcript ? buildFallbackPersona(transcript) : null;
+  const analysisSkipped = (!persona && !fallback) ? 1 : 0;
 
-  const portrait = persona?.portrait ?? "";
+  const portrait = persona?.portrait ?? fallback?.portrait ?? "";
   const structuredSignals = persona?.structured_signals ?? "";
-  const voiceSamples = persona?.voice_samples ?? "";
+  const voiceSamples = persona?.voice_samples ?? fallback?.voice_samples ?? "";
 
   try {
     await db
