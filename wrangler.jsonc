@@ -28,8 +28,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "clawnection-db",
-      "database_id": "5bddf833-3d10-43d2-a18c-e443d04e79af"
+      "database_name": "clawnection-agentic-db",
+      "database_id": "443c6d03-dbef-41b0-8b34-d78ec074ebe7"
     }
   ]
 }
