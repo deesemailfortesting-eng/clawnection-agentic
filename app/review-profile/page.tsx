@@ -57,7 +57,7 @@ const defaultForm: FormState = {
   preferenceMinAge: "24",
   preferenceMaxAge: "38",
   preferenceNotes: "",
-  agentType: "hosted",
+  agentType: "external-mock",
 };
 
 const fieldClass = "input-obsidian mt-1";
@@ -189,7 +189,11 @@ function ReviewProfileForm() {
     }
 
     setSaving(false);
-    router.push("/upload-data");
+    if (form.agentType === "external-mock") {
+      router.push(`/connect-agent?profileId=${encodeURIComponent(profile.id)}`);
+    } else {
+      router.push("/upload-data");
+    }
   }
 
   return (
@@ -436,14 +440,23 @@ function ReviewProfileForm() {
                 Agent type
               </legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="flex cursor-pointer gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--accent)]">
+                <label
+                  className="flex cursor-not-allowed gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-muted)] opacity-60"
+                  aria-disabled="true"
+                >
                   <input
                     type="radio"
                     className="mt-1"
+                    disabled
                     checked={form.agentType === "hosted"}
-                    onChange={() => update("agentType", "hosted")}
+                    onChange={() => undefined}
                   />
-                  Hosted WTF Radar agent
+                  <span>
+                    Hosted WTF Radar agent
+                    <span className="ml-2 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                      Coming soon
+                    </span>
+                  </span>
                 </label>
                 <label className="flex cursor-pointer gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--accent)]">
                   <input
@@ -452,7 +465,12 @@ function ReviewProfileForm() {
                     checked={form.agentType === "external-mock"}
                     onChange={() => update("agentType", "external-mock")}
                   />
-                  External mock (bring your own agent path)
+                  <span>
+                    Bring your own agent
+                    <span className="block text-xs text-[var(--text-muted)]">
+                      Plug in OpenClaw, ZeroClaw, or any Claude-driven agent.
+                    </span>
+                  </span>
                 </label>
               </div>
             </fieldset>
