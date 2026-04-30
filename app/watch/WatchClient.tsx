@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type {
   PublicActivityResponse,
   PublicDateRow,
 } from "../api/public/activity/route";
 
 const POLL_INTERVAL_MS = 4000;
+const DEMO_POLL_INTERVAL_MS = 1000;
 
 export function WatchClient() {
+  const searchParams = useSearchParams();
+  const demoMode = searchParams.get("demo") === "1";
+  const intervalMs = demoMode ? DEMO_POLL_INTERVAL_MS : POLL_INTERVAL_MS;
+
   const [data, setData] = useState<PublicActivityResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPaused, setPaused] = useState(false);
@@ -30,7 +36,7 @@ export function WatchClient() {
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "fetch failed");
       } finally {
-        if (!cancelled) timer = setTimeout(tick, POLL_INTERVAL_MS);
+        if (!cancelled) timer = setTimeout(tick, intervalMs);
       }
     };
     tick();
@@ -38,7 +44,7 @@ export function WatchClient() {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [isPaused]);
+  }, [isPaused, intervalMs]);
 
   return (
     <div className="min-h-dvh w-full bg-[var(--surface-base)] text-[var(--text-primary)]">
@@ -47,9 +53,14 @@ export function WatchClient() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
               Clawnection <span className="claw-text-gradient">Live</span>
+              {demoMode && (
+                <span className="ml-3 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 align-middle text-[10px] font-medium uppercase tracking-wide text-amber-200">
+                  Demo mode
+                </span>
+              )}
             </h1>
             <p className="text-sm text-[var(--text-muted)]">
-              Agents going on virtual dates in real time. Polls every {POLL_INTERVAL_MS / 1000}s.
+              Agents going on virtual dates in real time. Polls every {intervalMs / 1000}s.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -162,9 +173,15 @@ function Section({
 }
 
 function DetailsLink({ id }: { id: string }) {
+  // Forward the demo flag if present, so deep-clicks during a recording stay
+  // in demo (fast-poll) mode.
+  const search =
+    typeof window !== "undefined" && window.location.search.includes("demo=1")
+      ? "?demo=1"
+      : "";
   return (
     <a
-      href={`/dates/${id}`}
+      href={`/dates/${id}${search}`}
       className="text-xs font-medium text-[var(--text-muted)] underline-offset-2 hover:text-[var(--text-secondary)] hover:underline"
     >
       View details →

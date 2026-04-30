@@ -10,11 +10,13 @@ import type { Verdict } from "@/lib/agentPlatform/types";
 import type { RomanticProfile } from "@/lib/types/matching";
 
 const ACTIVE_POLL_MS = 4000;
+const DEMO_ACTIVE_POLL_MS = 1000;
 
 export function DateDetailClient({ dateId }: { dateId: string }) {
   const searchParams = useSearchParams();
   const devKey = searchParams.get("dev") ?? "";
   const devMode = devKey.length > 0;
+  const demoMode = searchParams.get("demo") === "1";
 
   const [data, setData] = useState<PublicDateDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,8 @@ export function DateDetailClient({ dateId }: { dateId: string }) {
           setError(err instanceof Error ? err.message : "fetch failed");
       } finally {
         const isActive = data?.date?.status === "active" || data?.date?.status === "pending";
-        const next = isActive ? ACTIVE_POLL_MS : 30_000;
+        const activePoll = demoMode ? DEMO_ACTIVE_POLL_MS : ACTIVE_POLL_MS;
+        const next = isActive ? activePoll : 30_000;
         if (!cancelled) timer = setTimeout(tick, next);
       }
     };
@@ -51,7 +54,7 @@ export function DateDetailClient({ dateId }: { dateId: string }) {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [dateId, data?.date?.status]);
+  }, [dateId, data?.date?.status, demoMode]);
 
   if (error) {
     return (
@@ -77,7 +80,7 @@ export function DateDetailClient({ dateId }: { dateId: string }) {
 
   return (
     <div className="min-h-dvh w-full bg-[var(--surface-base)] text-[var(--text-primary)]">
-      <Header data={data} devMode={devMode} />
+      <Header data={data} devMode={devMode} demoMode={demoMode} />
       <main className="mx-auto max-w-3xl space-y-8 px-6 py-8 sm:px-10">
         <PersonaPair data={data} devMode={devMode} />
         <Conversation data={data} devMode={devMode} />
@@ -91,9 +94,11 @@ export function DateDetailClient({ dateId }: { dateId: string }) {
 function Header({
   data,
   devMode,
+  demoMode,
 }: {
   data: PublicDateDetailResponse;
   devMode: boolean;
+  demoMode: boolean;
 }) {
   const status = data.date.status;
   return (
@@ -111,13 +116,18 @@ function Header({
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={status} mutualMatch={data.mutualMatch} />
+          {demoMode && (
+            <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-200">
+              Demo mode
+            </span>
+          )}
           {devMode && (
             <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-200">
               Dev mode
             </span>
           )}
           <a
-            href="/watch"
+            href={demoMode ? "/watch?demo=1" : "/watch"}
             className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-card)]"
           >
             ← Live
