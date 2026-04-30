@@ -339,13 +339,26 @@ export default function OnboardingPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className={labelClass}>Name *<input className={fieldClass} value={form.name} onChange={(e) => update("name", e.target.value)} required /></label>
               <label className={labelClass}>Age *<input className={fieldClass} inputMode="numeric" value={form.age} onChange={(e) => update("age", e.target.value)} required /></label>
-              <label className={labelClass}>Gender identity<input className={fieldClass} value={form.genderIdentity} onChange={(e) => update("genderIdentity", e.target.value)} /></label>
-              <label className={labelClass}>Looking for
-                <select className={fieldClass} value={form.lookingFor} onChange={(e) => update("lookingFor", e.target.value as FormState["lookingFor"])}>
-                  <option value="Men">Men</option>
-                  <option value="Women">Women</option>
-                  <option value="Everyone">Everyone</option>
+              <label className={`${labelClass} sm:col-span-2`}>Gender *
+                <select
+                  className={fieldClass}
+                  value={form.genderIdentity}
+                  onChange={(e) => {
+                    const g = e.target.value;
+                    update("genderIdentity", g);
+                    // This iteration: heterosexual matching only — auto-set lookingFor.
+                    if (g === "Male") update("lookingFor", "Women");
+                    else if (g === "Female") update("lookingFor", "Men");
+                  }}
+                  required
+                >
+                  <option value="">Select…</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
                 </select>
+                <span className="mt-1 block text-xs text-white/55">
+                  This iteration of Clawnection focuses on men and women seeking each other. Broader options are coming.
+                </span>
               </label>
               <label className={`${labelClass} sm:col-span-2`}>Location *<input className={fieldClass} value={form.location} onChange={(e) => update("location", e.target.value)} required /></label>
             </div>

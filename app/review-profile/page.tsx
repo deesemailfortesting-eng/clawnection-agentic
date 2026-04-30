@@ -237,21 +237,27 @@ function ReviewProfileForm() {
                 required
               />
             </label>
-            <label className="block text-sm text-[var(--text-secondary)]">
-              Gender identity
-              <input
+            <label className="block text-sm text-[var(--text-secondary)] sm:col-span-2">
+              Gender (required)
+              <select
                 className={fieldClass}
                 value={form.genderIdentity}
-                onChange={(e) => update("genderIdentity", e.target.value)}
-              />
-            </label>
-            <label className="block text-sm text-[var(--text-secondary)]">
-              Looking for
-              <input
-                className={fieldClass}
-                value={form.lookingFor}
-                onChange={(e) => update("lookingFor", e.target.value)}
-              />
+                onChange={(e) => {
+                  const g = e.target.value;
+                  update("genderIdentity", g);
+                  // Auto-derive lookingFor for this iteration (heterosexual matching only).
+                  if (g === "Male") update("lookingFor", "Women");
+                  else if (g === "Female") update("lookingFor", "Men");
+                }}
+                required
+              >
+                <option value="">Select…</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+              <span className="mt-1 block text-xs text-[var(--text-muted)]">
+                This iteration of Clawnection focuses on men and women seeking each other. Broader options are coming.
+              </span>
             </label>
             <label className="block text-sm text-[var(--text-secondary)] sm:col-span-2">
               Location (required)

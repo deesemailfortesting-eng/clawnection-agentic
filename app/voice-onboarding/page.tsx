@@ -68,7 +68,8 @@ const STEP_ORDER: StepId[] = [
   "occupationType",
   "occupationPlace",
   "gender",
-  "preference",
+  // "preference" is auto-derived from gender for this iteration (heterosexual
+  // matching only). Step skipped in the UI; state still maintained.
   "intent",
   "photo",
   "socials",
@@ -103,7 +104,7 @@ const PHASES: Phase[] = [
     label: "Your vibe",
     inProgressLabel: "Tell us your vibe",
     doneLabel: "Vibe ✓",
-    steps: ["gender", "preference", "intent", "photo", "socials"],
+    steps: ["gender", "intent", "photo", "socials"],
   },
   {
     id: "voice",
@@ -232,23 +233,18 @@ function formatDobDisplay(iso: string): string {
   });
 }
 
+// This iteration of Clawnection focuses on men and women seeking each other.
+// Broader options will return — kept narrow here to make testing tractable.
 const genderOptions = [
-  { value: "woman", label: "Woman" },
-  { value: "man", label: "Man" },
-  { value: "non-binary", label: "Non-binary" },
-  { value: "other", label: "Something else" },
-  { value: "prefer-not-to-say", label: "Prefer not to say" },
+  { value: "Male", label: "Male" },
+  { value: "Female", label: "Female" },
 ] as const;
 
+// `preference` is auto-derived from gender for this iteration; the choice array
+// stays so existing call paths still resolve, but the UI hides the step.
 const preferenceOptions = [
-  { value: "straight", label: "Straight" },
-  { value: "gay", label: "Gay" },
-  { value: "lesbian", label: "Lesbian" },
-  { value: "bisexual", label: "Bisexual" },
-  { value: "pansexual", label: "Pansexual" },
-  { value: "queer", label: "Queer" },
-  { value: "asexual", label: "Asexual" },
-  { value: "prefer-not-to-say", label: "Prefer not to say" },
+  { value: "Women", label: "Women" },
+  { value: "Men", label: "Men" },
 ] as const;
 
 const intentOptions: ReadonlyArray<{
@@ -803,7 +799,7 @@ export default function VoiceOnboardingPage() {
         {step === "gender" && (
           <StepLayout
             title="I am a..."
-            description="Pick the option that fits best — you can be more specific in the voice chat."
+            description="This iteration of Clawnection focuses on men and women seeking each other. Broader options are coming."
             onContinue={goNext}
             continueDisabled={continueDisabled}
           >
@@ -814,7 +810,11 @@ export default function VoiceOnboardingPage() {
                   type="button"
                   className="option-tile"
                   data-selected={gender === option.value}
-                  onClick={() => setGender(option.value)}
+                  onClick={() => {
+                    setGender(option.value);
+                    // Auto-set preference for this iteration (heterosexual only).
+                    setPreference(option.value === "Male" ? "Women" : "Men");
+                  }}
                 >
                   <span>{option.label}</span>
                 </button>
