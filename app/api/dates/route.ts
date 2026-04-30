@@ -16,7 +16,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
 
-  let body: { recipientAgentId?: string; openingMessage?: string; maxTurns?: number };
+  let body: {
+    recipientAgentId?: string;
+    openingMessage?: string;
+    maxTurns?: number;
+    experimentCohort?: string;
+    subjectModel?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -75,10 +81,19 @@ export async function POST(req: NextRequest) {
   await db
     .prepare(
       `INSERT INTO virtual_dates
-       (id, initiator_agent_id, recipient_agent_id, status, opening_message, turn_count, max_turns)
-       VALUES (?, ?, ?, 'pending', ?, 0, ?)`,
+       (id, initiator_agent_id, recipient_agent_id, status, opening_message,
+        turn_count, max_turns, experiment_cohort, subject_model)
+       VALUES (?, ?, ?, 'pending', ?, 0, ?, ?, ?)`,
     )
-    .bind(dateId, agent.id, body.recipientAgentId, opening, maxTurns)
+    .bind(
+      dateId,
+      agent.id,
+      body.recipientAgentId,
+      opening,
+      maxTurns,
+      body.experimentCohort?.trim() || null,
+      body.subjectModel?.trim() || null,
+    )
     .run();
 
   const row = await db

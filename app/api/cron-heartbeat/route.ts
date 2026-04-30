@@ -21,6 +21,7 @@ type Persona = {
   id: string;
   name: string;
   age: number;
+  location?: string;
   bio?: string;
   interests?: string[];
   values?: string[];
@@ -59,6 +60,51 @@ type InboxResponse = {
 const MODEL = "claude-haiku-4-5-20251001";
 const DEFAULT_AGENTS_PER_TICK = 3;
 const MAX_AGENTS_PER_TICK = 10;
+
+// ----- E1 (persona-richness ablation) -----
+//
+// Subject agents tagged with framework `exp-e1-rich`, `exp-e1-medium`, or
+// `exp-e1-thin` get a deliberately-varied amount of THEIR OWN persona context
+// in the prompt that drives their decisions. The platform persona stored in
+// D1 is the same in all cases (we share local-dee across all three subjects);
+// what differs is how much we hand to Claude when composing turns and
+// verdicts. This isolates "agent's access to its own persona" as the
+// independent variable.
+type PersonaRichness = "rich" | "medium" | "thin";
+
+function richnessForFramework(fw: string | null | undefined): PersonaRichness {
+  if (!fw) return "rich";
+  if (fw === "exp-e1-medium") return "medium";
+  if (fw === "exp-e1-thin") return "thin";
+  return "rich";
+}
+
+function personaContextFor(persona: Persona, richness: PersonaRichness): string {
+  if (richness === "rich") return JSON.stringify(persona, null, 2);
+  if (richness === "medium") {
+    return JSON.stringify(
+      {
+        name: persona.name,
+        age: persona.age,
+        location: persona.location,
+        bio: persona.bio,
+        topInterests: (persona.interests ?? []).slice(0, 3),
+      },
+      null,
+      2,
+    );
+  }
+  // thin
+  return JSON.stringify(
+    {
+      name: persona.name,
+      age: persona.age,
+      bio: persona.bio,
+    },
+    null,
+    2,
+  );
+}
 
 // ----- Auth helpers -----
 
@@ -159,9 +205,11 @@ async function runOneAgentTick(args: {
 
   // Resolve self
   const me = (await api("GET", "/api/agent/me")) as {
-    agent: { id: string; displayName: string };
+    agent: { id: string; displayName: string; framework: string | null };
     persona: Persona;
   };
+  const richness = richnessForFramework(me.agent.framework);
+  const ownPersonaContext = personaContextFor(me.persona, richness);
   const summary: TickSummary = {
     agentId: me.agent.id,
     personaName: me.persona.name,
@@ -187,7 +235,7 @@ Bias toward accepting unless there is a clear reason not to:
 Return ONLY JSON, no markdown fences: {"action": "accept" | "decline", "reason": "<1 sentence>"}
 
 YOUR PERSONA:
-${JSON.stringify(me.persona, null, 2)}
+${ownPersonaContext}
 
 THEIR PERSONA:
 ${JSON.stringify(inv.fromPersona, null, 2)}`;
@@ -236,7 +284,7 @@ ${JSON.stringify(inv.fromPersona, null, 2)}`;
 - Output the raw message text only — no quotes, no "Name:" prefix.
 
 YOUR PERSONA:
-${JSON.stringify(me.persona, null, 2)}
+${ownPersonaContext}
 
 THEIR PERSONA:
 ${JSON.stringify(d.counterpartPersona, null, 2)}`;
@@ -281,7 +329,7 @@ Be honest. A bad date is a useful signal — humans are wasting time when their 
 Return ONLY JSON, no markdown fences: {"wouldMeetIrl": <true|false>, "rating": <1-10>, "reasoning": "<1-2 sentences>"}
 
 YOUR PERSONA:
-${JSON.stringify(me.persona, null, 2)}
+${ownPersonaContext}
 
 THEIR PERSONA:
 ${JSON.stringify(w.counterpartPersona, null, 2)}`;
