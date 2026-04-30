@@ -182,6 +182,41 @@ function computeAgeFromIsoDate(iso: string): number {
 }
 
 /*
+ * Parses a permissive date string like "03/15/2002", "3-15-2002", or
+ * "2002-03-15" into an ISO YYYY-MM-DD string. Returns empty string for
+ * unrecognized or out-of-range input. Two-digit years are rejected because
+ * 02 vs 1902 vs 2002 is ambiguous.
+ */
+function parseDobInput(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return "";
+  // Match either MM/DD/YYYY (or MM-DD-YYYY) or YYYY-MM-DD (or YYYY/MM/DD).
+  const usMatch = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/.exec(trimmed);
+  const isoMatch = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/.exec(trimmed);
+  let year: number, month: number, day: number;
+  if (usMatch) {
+    month = Number(usMatch[1]);
+    day = Number(usMatch[2]);
+    year = Number(usMatch[3]);
+  } else if (isoMatch) {
+    year = Number(isoMatch[1]);
+    month = Number(isoMatch[2]);
+    day = Number(isoMatch[3]);
+  } else {
+    return "";
+  }
+  if (month < 1 || month > 12) return "";
+  if (day < 1 || day > 31) return "";
+  if (year < 1900 || year > new Date().getFullYear()) return "";
+  // Validate the day is real for the month (handles Feb 30, etc.).
+  const probe = new Date(year, month - 1, day);
+  if (probe.getFullYear() !== year || probe.getMonth() !== month - 1 || probe.getDate() !== day) {
+    return "";
+  }
+  return `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+}
+
+/*
  * Renders a YYYY-MM-DD date string into a friendly format like 'June 12, 2002'
  * for the inline confirmation under the picker.
  */
@@ -262,7 +297,6 @@ export default function VoiceOnboardingPage() {
   const vapiRef = useRef<Vapi | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileRef = useRef<ProfileData>({});
-  const dateInputRef = useRef<HTMLInputElement | null>(null);
 
   // Stable id created once per onboarding session so every partial sync to
   // /api/profiles upserts the same row in D1, and so the Vapi webhook (which
@@ -282,11 +316,12 @@ export default function VoiceOnboardingPage() {
   // Default the DOB to the latest valid date — i.e. 18 years ago today — so
   // the system date picker opens anchored at the age-18 boundary instead of
   // today's date. Users scroll back from there to their actual birth year.
-  const [dob, setDob] = useState<string>(() => {
-    const today = new Date();
-    today.setFullYear(today.getFullYear() - 18);
-    return today.toISOString().slice(0, 10);
-  });
+  // ISO YYYY-MM-DD form (used internally for age calculation + persistence).
+  // Empty until the user types a parseable date.
+  const [dob, setDob] = useState<string>("");
+  // Raw user input as typed. Lets the user type freely without us forcing a
+  // formatted display in the middle of typing.
+  const [dobInput, setDobInput] = useState<string>("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
   const [occupationType, setOccupationType] = useState<"work" | "school" | "">("");
@@ -314,7 +349,7 @@ export default function VoiceOnboardingPage() {
   }, [profile]);
 
   useEffect(() => {
-    document.title = "Onboarding · wtfradar";
+    document.title = "Onboarding · Clawnection";
   }, []);
 
   const ageNumber = computeAgeFromIsoDate(dob);
@@ -322,16 +357,6 @@ export default function VoiceOnboardingPage() {
   const ageIsValid = ageNumber >= 18 && ageNumber <= 120;
   const phoneDigitsOnly = phone.replace(/\D/g, "");
   const phoneIsValid = phoneDigitsOnly.length >= 7 && phoneDigitsOnly.length <= 15;
-  const dobMaxIso = useMemo(() => {
-    const today = new Date();
-    today.setFullYear(today.getFullYear() - 18);
-    return today.toISOString().slice(0, 10);
-  }, []);
-  const dobMinIso = useMemo(() => {
-    const today = new Date();
-    today.setFullYear(today.getFullYear() - 100);
-    return today.toISOString().slice(0, 10);
-  }, []);
 
   /*
    * Merge the form fields the user has typed so far with whatever the voice
@@ -529,7 +554,7 @@ export default function VoiceOnboardingPage() {
             ? `they study${occupationPlace ? ` at ${occupationPlace}` : ""}`
             : "";
       const intentLabel = intentOptions.find((o) => o.value === intent)?.label.toLowerCase() ?? "long-term";
-      const firstMessage = `Hey ${firstName}. This is wtfradar. You said you're ${ageNumber}, based in ${location}${occupationDetail ? `, and ${occupationDetail}` : ""}. You identify as ${gender}, you're interested in ${preference}, and you're here for ${intentLabel}. We'll have a guided conversation to round out your dating profile. There are no right answers. To begin — what does an amazing first date look like for you?`;
+      const firstMessage = `Hey ${firstName}. This is Clawnection. You said you're ${ageNumber}, based in ${location}${occupationDetail ? `, and ${occupationDetail}` : ""}. You identify as ${gender}, you're interested in ${preference}, and you're here for ${intentLabel}. We'll have a guided conversation to round out your dating profile. There are no right answers. To begin — what does an amazing first date look like for you?`;
       await vapiRef.current.start(vapiAssistantId, {
         firstMessage,
         variableValues: {
@@ -578,8 +603,8 @@ export default function VoiceOnboardingPage() {
                 ← Back
               </button>
             ) : (
-              <Link href="/" className="text-sm font-bold text-white/58" aria-label="wtfradar home">
-                wtfradar
+              <Link href="/" className="text-sm font-bold text-white/58" aria-label="Clawnection home">
+                Clawnection
               </Link>
             )}
           </div>
@@ -597,7 +622,7 @@ export default function VoiceOnboardingPage() {
           <section className="flex flex-1 flex-col justify-between gap-8">
             <div className="space-y-5">
               <h1 className="text-5xl font-black leading-[0.95] tracking-[-0.05em] text-white">
-                Let&apos;s build your<br />wtf<span className="radar-text-gradient">radar</span> profile.
+                Let&apos;s build your<br />wtf<span className="claw-text-gradient">radar</span> profile.
               </h1>
               <p className="text-base leading-7 text-white/70">
                 A few quick taps, then a short voice chat with your AI assistant. No long forms — your agent learns you naturally.
@@ -655,57 +680,31 @@ export default function VoiceOnboardingPage() {
         {step === "dob" && (
           <StepLayout
             title="When's your birthday?"
-            description="You must be 18 or older to use wtfradar. We only show your age, not your full birthday."
+            description="You must be 18 or older to use Clawnection. We only show your age, not your full birthday."
             onContinue={goNext}
             continueDisabled={continueDisabled}
             error={dobIsComplete && !ageIsValid ? "You must be 18 or older to continue." : undefined}
           >
             <label className="grid gap-1 text-sm font-bold text-white/84">
               <span className="text-xs uppercase tracking-[0.18em] text-white/52">Date of birth</span>
-              <button
-                type="button"
-                className="field date-trigger flex items-center justify-between text-left text-lg"
-                onClick={() => {
-                  const input = dateInputRef.current;
-                  if (!input) return;
-                  if (typeof input.showPicker === "function") {
-                    try {
-                      input.showPicker();
-                      return;
-                    } catch {
-                      // showPicker can throw if the input is not focused — fall through to focus+click.
-                    }
-                  }
-                  input.focus();
-                  input.click();
-                }}
-                aria-haspopup="dialog"
-                aria-label={
-                  dob ? `Change date of birth, currently ${formatDobDisplay(dob)}` : "Pick your date of birth"
-                }
-              >
-                <span className={dob ? "text-white" : "text-white/42"}>
-                  {dob ? formatDobDisplay(dob) : "Tap to pick a date"}
-                </span>
-                <span aria-hidden="true" className="text-white/56">
-                  📅
-                </span>
-              </button>
               <input
-                ref={dateInputRef}
-                type="date"
-                className="sr-only"
-                value={dob}
-                onChange={(event) => setDob(event.target.value)}
-                min={dobMinIso}
-                max={dobMaxIso}
-                tabIndex={-1}
-                aria-hidden="true"
+                type="text"
+                inputMode="numeric"
+                autoComplete="bday"
+                placeholder="MM/DD/YYYY"
+                className="field text-lg"
+                value={dobInput}
+                onChange={(event) => {
+                  const raw = event.target.value;
+                  setDobInput(raw);
+                  setDob(parseDobInput(raw));
+                }}
+                aria-label="Date of birth, MM slash DD slash YYYY"
               />
             </label>
-            {ageIsValid ? (
+            {dob && ageIsValid ? (
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/52">
-                You&apos;ll be shown as {ageNumber}
+                {formatDobDisplay(dob)} · you&apos;ll be shown as {ageNumber}
               </p>
             ) : null}
           </StepLayout>

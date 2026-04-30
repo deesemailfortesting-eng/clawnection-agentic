@@ -227,7 +227,7 @@ a {
   background: linear-gradient(135deg, var(--chromia-rose), var(--chromia-violet));
 }
 
-.radar-text-gradient {
+.claw-text-gradient {
   background: linear-gradient(135deg, var(--chromia-blush), var(--chromia-gold));
   -webkit-background-clip: text;
   background-clip: text;
@@ -403,7 +403,7 @@ select.field option {
 }
 
 /*
- * The voice orb is the wtfradar logo, blown up: a big red disc with the radar's
+ * The voice orb is the Clawnection logo, blown up: a big red disc with the radar's
  * concentric rings, a rotating sweep, and pulsing rings emanating outward when
  * the user is on a live call. It doubles as the "tap to talk" button.
  */

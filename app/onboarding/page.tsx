@@ -209,7 +209,7 @@ export default function OnboardingPage() {
   const profilePreview = useMemo(() => `${form.name || "Your name"}, intent: ${form.relationshipIntent}`, [form]);
 
   useEffect(() => {
-    document.title = "Build your profile · wtfradar";
+    document.title = "Build your profile · Clawnection";
   }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -325,7 +325,7 @@ export default function OnboardingPage() {
     <PhoneShell>
       <main className="screen-padding space-y-6">
         <header className="space-y-4">
-          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
+          <Link href="/" className="text-sm font-bold text-white/58">Clawnection</Link>
           <p className="pill w-fit">Text onboarding</p>
           <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">Build your dating profile</h1>
           <p className="text-sm leading-6 text-white/66">
@@ -593,7 +593,7 @@ export default function OnboardingPage() {
                   >
                     <input type="radio" name="agentType" disabled checked={form.agentType === "hosted"} onChange={() => undefined} />
                     <span>
-                      Hosted wtfradar agent
+                      Hosted Clawnection agent
                       <span className="ml-2 rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
                         Coming soon
                       </span>

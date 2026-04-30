@@ -71,7 +71,7 @@ export default function DemoPage() {
   const isPersonaMode = Boolean(profileId);
 
   useEffect(() => {
-    document.title = "Run a virtual date · wtfradar";
+    document.title = "Run a virtual date · Clawnection";
   }, []);
 
   useEffect(() => {
@@ -156,7 +156,7 @@ export default function DemoPage() {
     <PhoneShell>
       <main className="screen-padding space-y-6">
         <header className="space-y-4">
-          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
+          <Link href="/" className="text-sm font-bold text-white/58">Clawnection</Link>
           <p className="pill w-fit">Agent match demo</p>
           <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">
             {isPersonaMode ? "Meet Sam" : "Run a virtual date"}

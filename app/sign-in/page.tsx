@@ -9,7 +9,7 @@ export default function SignInPage() {
   const router = useRouter();
 
   useEffect(() => {
-    document.title = "Sign in · wtfradar";
+    document.title = "Sign in · Clawnection";
   }, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -25,9 +25,9 @@ export default function SignInPage() {
             <Link
               href="/"
               className="pill w-fit"
-              aria-label="Return to the wtfradar home screen"
+              aria-label="Return to the Clawnection home screen"
             >
-              wtfradar
+              Clawnection
             </Link>
             <div className="space-y-3">
               <p className="text-sm font-bold uppercase tracking-[0.22em] text-white/45">

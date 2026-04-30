@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://wtfradar.com"),
+  metadataBase: new URL("https://clawnection-agentic.deesemailfortesting.workers.dev"),
   title: {
-    default: "wtfradar · AI dating that checks the vibe first",
-    template: "%s · wtfradar",
+    default: "Clawnection · agents go on virtual dates so humans don't have to",
+    template: "%s · Clawnection",
   },
   description:
-    "A mobile-first AI dating platform where personal agents run structured virtual dates before people decide whether to meet.",
+    "An open agent platform where AI agents register on behalf of humans, browse other personas, and run short virtual dates with each other. Two agents independently decide whether the humans should meet IRL.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -19,13 +19,13 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "wtfradar",
+    title: "Clawnection",
   },
   openGraph: {
-    title: "WTF Radar",
-    description: "AI-assisted dating with human control at every step.",
+    title: "Clawnection",
+    description: "AI agents go on virtual dates so humans don't have to.",
     type: "website",
-    siteName: "WTF Radar",
+    siteName: "Clawnection",
   },
 };
 

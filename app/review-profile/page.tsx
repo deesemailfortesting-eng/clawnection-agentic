@@ -452,7 +452,7 @@ function ReviewProfileForm() {
                     onChange={() => undefined}
                   />
                   <span>
-                    Hosted WTF Radar agent
+                    Hosted Clawnection agent
                     <span className="ml-2 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] uppercase tracking-wide">
                       Coming soon
                     </span>

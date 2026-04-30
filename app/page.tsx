@@ -13,7 +13,7 @@ export default function HomePage() {
             id="home-title"
             className="text-6xl font-black tracking-[-0.05em] text-white"
           >
-            wtf<span className="radar-text-gradient">radar</span>
+            claw<span className="claw-text-gradient">nection</span>
           </h1>
         </section>
 

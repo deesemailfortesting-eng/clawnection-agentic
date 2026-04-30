@@ -22,7 +22,7 @@ function ResultsPageContent() {
   const [isRestoring, setIsRestoring] = useState(true);
 
   useEffect(() => {
-    document.title = "Virtual date results · wtfradar";
+    document.title = "Virtual date results · Clawnection";
 
     let cancelled = false;
 
@@ -71,7 +71,7 @@ function ResultsPageContent() {
     <PhoneShell>
       <main className="screen-padding space-y-6">
         <header className="space-y-3">
-          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
+          <Link href="/" className="text-sm font-bold text-white/58">Clawnection</Link>
           <p className="pill w-fit">Virtual date results</p>
           <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">
             {result.profileA.name} × {result.profileB.name}

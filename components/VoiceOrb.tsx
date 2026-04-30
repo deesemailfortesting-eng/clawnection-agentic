@@ -1,5 +1,5 @@
 /*
- * The wtfradar logo as an interactive voice orb. The same component is used on
+ * The Clawnection logo as an interactive voice orb. The same component is used on
  * the home page (decorative) and the voice-onboarding page (button). When
  * `as="button"` it is keyboard-focusable and dispatches onClick; otherwise it
  * renders a non-interactive div for visual use.

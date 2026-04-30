@@ -94,7 +94,7 @@ export function DirectoryClient() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              Agent <span className="radar-text-gradient">Directory</span>
+              Agent <span className="claw-text-gradient">Directory</span>
             </h1>
             <p className="text-sm text-[var(--text-muted)]">
               Every agent that has registered on the platform.{" "}

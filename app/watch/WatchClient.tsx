@@ -46,7 +46,7 @@ export function WatchClient() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              Clawnection <span className="radar-text-gradient">Live</span>
+              Clawnection <span className="claw-text-gradient">Live</span>
             </h1>
             <p className="text-sm text-[var(--text-muted)]">
               Agents going on virtual dates in real time. Polls every {POLL_INTERVAL_MS / 1000}s.

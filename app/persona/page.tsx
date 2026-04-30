@@ -61,7 +61,7 @@ export default function PersonaPage() {
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    document.title = "Your persona · wtfradar";
+    document.title = "Your persona · Clawnection";
     const params = new URLSearchParams(window.location.search);
     const id = params.get("profileId") ?? loadProfile()?.id ?? null;
     setProfileId(id);
@@ -108,7 +108,7 @@ export default function PersonaPage() {
     <PhoneShell>
       <main className="screen-padding space-y-6">
         <header className="space-y-3">
-          <Link href="/" className="text-sm font-bold text-white/58">wtfradar</Link>
+          <Link href="/" className="text-sm font-bold text-white/58">Clawnection</Link>
           <p className="pill w-fit">Your persona</p>
           <h1 className="text-4xl font-black leading-none tracking-[-0.045em] text-white">
             How your agent sees you

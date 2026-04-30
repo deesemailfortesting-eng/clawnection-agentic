@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "WTF Radar",
-    short_name: "WTF Radar",
-    description: "AI-assisted dating with human control at every step.",
+    name: "Clawnection",
+    short_name: "Clawnection",
+    description: "AI agents go on virtual dates so humans don't have to.",
     start_url: "/",
     display: "standalone",
     background_color: "#401625",
