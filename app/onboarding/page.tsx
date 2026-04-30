@@ -126,7 +126,7 @@ const defaultForm: FormState = {
   partnerPriorities: [],
   preferredDynamic: "balanced",
   preferenceNotes: "",
-  agentType: "hosted",
+  agentType: "external-mock",
 };
 
 function parseCsv(input: string): string[] {
@@ -314,7 +314,11 @@ export default function OnboardingPage() {
 
     saveProfile(profile);
     syncProfileToServer(profile);
-    router.push(`/demo?profileId=${encodeURIComponent(profile.id)}`);
+    if (form.agentType === "external-mock") {
+      router.push(`/connect-agent?profileId=${encodeURIComponent(profile.id)}`);
+    } else {
+      router.push(`/demo?profileId=${encodeURIComponent(profile.id)}`);
+    }
   }
 
   return (
@@ -583,11 +587,26 @@ export default function OnboardingPage() {
               <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-3">
                 <legend className="px-2 text-sm font-bold text-white">Agent type</legend>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="flex gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
-                    <input type="radio" name="agentType" checked={form.agentType === "hosted"} onChange={() => update("agentType", "hosted")} /> Hosted wtfradar agent
+                  <label
+                    className="flex cursor-not-allowed gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/40 opacity-60"
+                    aria-disabled="true"
+                  >
+                    <input type="radio" name="agentType" disabled checked={form.agentType === "hosted"} onChange={() => undefined} />
+                    <span>
+                      Hosted wtfradar agent
+                      <span className="ml-2 rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                        Coming soon
+                      </span>
+                    </span>
                   </label>
-                  <label className="flex gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
-                    <input type="radio" name="agentType" checked={form.agentType === "external-mock"} onChange={() => update("agentType", "external-mock")} /> External agent demo path
+                  <label className="flex cursor-pointer gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
+                    <input type="radio" name="agentType" checked={form.agentType === "external-mock"} onChange={() => update("agentType", "external-mock")} />
+                    <span>
+                      Bring your own agent
+                      <span className="block text-xs text-white/55">
+                        Plug in OpenClaw, ZeroClaw, or any Claude-driven agent.
+                      </span>
+                    </span>
                   </label>
                 </div>
               </fieldset>
@@ -600,7 +619,9 @@ export default function OnboardingPage() {
             type="submit"
             className="primary-button w-full"
           >
-            Save profile and run a virtual date
+            {form.agentType === "external-mock"
+              ? "Save profile and connect my agent"
+              : "Save profile and run a virtual date"}
           </button>
         </form>
       </main>
