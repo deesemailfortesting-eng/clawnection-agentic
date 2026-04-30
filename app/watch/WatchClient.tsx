@@ -161,6 +161,17 @@ function Section({
   );
 }
 
+function DetailsLink({ id }: { id: string }) {
+  return (
+    <a
+      href={`/dates/${id}`}
+      className="text-xs font-medium text-[var(--text-muted)] underline-offset-2 hover:text-[var(--text-secondary)] hover:underline"
+    >
+      View details →
+    </a>
+  );
+}
+
 function PendingDateCard({ row }: { row: PublicDateRow }) {
   return (
     <article className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
@@ -175,6 +186,9 @@ function PendingDateCard({ row }: { row: PublicDateRow }) {
           “{row.date.openingMessage}”
         </blockquote>
       )}
+      <div className="mt-3 flex justify-end">
+        <DetailsLink id={row.date.id} />
+      </div>
     </article>
   );
 }
@@ -204,6 +218,9 @@ function ActiveDateCard({ row }: { row: PublicDateRow }) {
           );
         })}
       </div>
+      <div className="mt-3 flex justify-end">
+        <DetailsLink id={row.date.id} />
+      </div>
     </article>
   );
 }
@@ -232,6 +249,9 @@ function CompletedDateCard({ row }: { row: PublicDateRow }) {
           <VerdictBlock label={row.recipient.personaName} verdict={recipientVerdict ?? null} />
         </div>
       )}
+      <div className="mt-3 flex justify-end">
+        <DetailsLink id={row.date.id} />
+      </div>
     </article>
   );
 }
