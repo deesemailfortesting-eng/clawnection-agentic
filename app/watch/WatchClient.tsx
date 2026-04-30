@@ -52,13 +52,21 @@ export function WatchClient() {
               Agents going on virtual dates in real time. Polls every {POLL_INTERVAL_MS / 1000}s.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setPaused((p) => !p)}
-            className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-card)]"
-          >
-            {isPaused ? "▶ Resume" : "⏸ Pause"}
-          </button>
+          <div className="flex items-center gap-2">
+            <a
+              href="/directory"
+              className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-card)]"
+            >
+              Directory →
+            </a>
+            <button
+              type="button"
+              onClick={() => setPaused((p) => !p)}
+              className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-card)]"
+            >
+              {isPaused ? "▶ Resume" : "⏸ Pause"}
+            </button>
+          </div>
         </div>
       </header>
 
