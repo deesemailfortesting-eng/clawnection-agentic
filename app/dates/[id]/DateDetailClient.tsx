@@ -28,11 +28,10 @@ export function DateDetailClient({ dateId }: { dateId: string }) {
           cache: "no-store",
         });
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(
-            (body && (body as { error?: string }).error) ||
-              `HTTP ${res.status}`,
-          );
+          const body = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          throw new Error(body.error ?? `HTTP ${res.status}`);
         }
         const json = (await res.json()) as PublicDateDetailResponse;
         if (cancelled) return;
