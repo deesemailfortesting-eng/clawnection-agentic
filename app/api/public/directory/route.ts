@@ -67,32 +67,36 @@ export async function GET() {
   const completed = new Map<string, number>();
   const mutual = new Map<string, number>();
 
+  // Stat queries are intentionally unbounded (no IN clause) and we filter in
+  // JS — avoids D1's bound-parameter ceiling, and the row counts are small
+  // enough that the cost is negligible.
   if (agentIds.length > 0) {
-    const placeholders = agentIds.map(() => "?").join(",");
+    const agentIdSet = new Set(agentIds);
 
     const { results: initRows } = await db
       .prepare(
         `SELECT initiator_agent_id AS agent_id, COUNT(*) AS c
          FROM virtual_dates
-         WHERE initiator_agent_id IN (${placeholders})
          GROUP BY initiator_agent_id`,
       )
-      .bind(...agentIds)
       .all<{ agent_id: string; c: number }>();
-    for (const r of initRows ?? []) initiated.set(r.agent_id, Number(r.c));
+    for (const r of initRows ?? []) {
+      if (agentIdSet.has(r.agent_id)) initiated.set(r.agent_id, Number(r.c));
+    }
 
     const { results: completedRows } = await db
       .prepare(
         `SELECT agent_id, COUNT(*) AS c FROM (
-           SELECT initiator_agent_id AS agent_id FROM virtual_dates WHERE status = 'completed' AND initiator_agent_id IN (${placeholders})
+           SELECT initiator_agent_id AS agent_id FROM virtual_dates WHERE status = 'completed'
            UNION ALL
-           SELECT recipient_agent_id AS agent_id FROM virtual_dates WHERE status = 'completed' AND recipient_agent_id IN (${placeholders})
+           SELECT recipient_agent_id AS agent_id FROM virtual_dates WHERE status = 'completed'
          )
          GROUP BY agent_id`,
       )
-      .bind(...agentIds, ...agentIds)
       .all<{ agent_id: string; c: number }>();
-    for (const r of completedRows ?? []) completed.set(r.agent_id, Number(r.c));
+    for (const r of completedRows ?? []) {
+      if (agentIdSet.has(r.agent_id)) completed.set(r.agent_id, Number(r.c));
+    }
 
     const { results: mutualRows } = await db
       .prepare(
@@ -100,21 +104,19 @@ export async function GET() {
            SELECT vd.initiator_agent_id AS agent_id
            FROM virtual_dates vd
            WHERE vd.status = 'completed'
-             AND (vd.initiator_agent_id IN (${placeholders}) OR vd.recipient_agent_id IN (${placeholders}))
              AND (SELECT COUNT(*) FROM verdicts v WHERE v.date_id = vd.id AND v.would_meet_irl = 1) >= 2
            UNION ALL
            SELECT vd.recipient_agent_id AS agent_id
            FROM virtual_dates vd
            WHERE vd.status = 'completed'
-             AND (vd.initiator_agent_id IN (${placeholders}) OR vd.recipient_agent_id IN (${placeholders}))
              AND (SELECT COUNT(*) FROM verdicts v WHERE v.date_id = vd.id AND v.would_meet_irl = 1) >= 2
          )
-         WHERE agent_id IN (${placeholders})
          GROUP BY agent_id`,
       )
-      .bind(...agentIds, ...agentIds, ...agentIds, ...agentIds, ...agentIds)
       .all<{ agent_id: string; c: number }>();
-    for (const r of mutualRows ?? []) mutual.set(r.agent_id, Number(r.c));
+    for (const r of mutualRows ?? []) {
+      if (agentIdSet.has(r.agent_id)) mutual.set(r.agent_id, Number(r.c));
+    }
   }
 
   const entries: DirectoryEntry[] = agents.map((row) => {
