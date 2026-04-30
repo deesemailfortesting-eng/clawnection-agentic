@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { OnboardingSection } from "@/components/OnboardingSection";
 import { PhoneShell } from "@/components/PhoneShell";
-import { saveProfile, saveSignals, saveGap, syncProfileToServer, syncSignalsToServer, syncGapToServer } from "@/lib/storage";
+import { loadProfile, saveProfile, saveSignals, saveGap, syncProfileToServer, syncSignalsToServer, syncGapToServer } from "@/lib/storage";
 import { CommunicationStyle, InterestProfile, RelationshipIntent, RomanticProfile } from "@/lib/types/matching";
 import { SelfAwarenessGap, WhatsAppSignals } from "@/lib/types/behavioral";
 import { WhatsAppUpload } from "@/components/WhatsAppUpload";
@@ -210,6 +210,41 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     document.title = "Build your profile · Clawnection";
+    // Pre-fill basics (name, age, gender, location, etc.) from any previously
+    // saved profile — including data captured during the voice onboarding
+    // step-by-step that lives in the same localStorage slot.
+    const existing = loadProfile();
+    if (!existing) return;
+    setForm((prev) => ({
+      ...prev,
+      name: existing.name ?? prev.name,
+      age: existing.age ? String(existing.age) : prev.age,
+      genderIdentity: existing.genderIdentity ?? prev.genderIdentity,
+      lookingFor:
+        (existing.lookingFor as FormState["lookingFor"]) ?? prev.lookingFor,
+      location: existing.location ?? prev.location,
+      relationshipIntent: existing.relationshipIntent ?? prev.relationshipIntent,
+      bio: existing.bio ?? prev.bio,
+      values: (existing.values ?? []).join(", ") || prev.values,
+      communicationStyle:
+        existing.communicationStyle ?? prev.communicationStyle,
+      sleepSchedule:
+        existing.lifestyleHabits?.sleepSchedule ?? prev.sleepSchedule,
+      socialEnergy:
+        existing.lifestyleHabits?.socialEnergy ?? prev.socialEnergy,
+      activityLevel:
+        existing.lifestyleHabits?.activityLevel ?? prev.activityLevel,
+      drinking: existing.lifestyleHabits?.drinking ?? prev.drinking,
+      smoking: existing.lifestyleHabits?.smoking ?? prev.smoking,
+      idealFirstDate: existing.idealFirstDate ?? prev.idealFirstDate,
+      preferenceMinAge: existing.preferenceAgeRange?.min
+        ? String(existing.preferenceAgeRange.min)
+        : prev.preferenceMinAge,
+      preferenceMaxAge: existing.preferenceAgeRange?.max
+        ? String(existing.preferenceAgeRange.max)
+        : prev.preferenceMaxAge,
+      preferenceNotes: existing.preferenceNotes ?? prev.preferenceNotes,
+    }));
   }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {

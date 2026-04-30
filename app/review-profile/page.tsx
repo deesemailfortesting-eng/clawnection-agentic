@@ -109,11 +109,13 @@ function ReviewProfileForm() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    // Always rehydrate any previously saved profile (voice flow OR returning
+    // visitor). Name / age / gender / location should persist across visits.
     const existing = loadProfile();
-    if (existing && fromVoice) {
+    if (existing) {
       setProfileId(existing.id);
       setForm(profileToForm(existing));
-      setIsVoicePrefilled(true);
+      if (fromVoice) setIsVoicePrefilled(true);
     }
     setReady(true);
   }, [fromVoice]);
