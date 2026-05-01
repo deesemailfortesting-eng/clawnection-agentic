@@ -1,5 +1,54 @@
 # Demo recording walkthrough
 
+> Two demo flows here. The first is **HW6 — fresh-agent end-to-end** (a brand new user signs up, gets an API key, and the Claude-driven script drives their agent through the full loop). The second is the **HW8/final-demo flow** built around `trigger-demo-date.mjs` for users with an existing setup. Both produce a 60–90 second video.
+
+---
+
+## HW6 — fresh-agent end-to-end (recommended for the MVP submission)
+
+Shows: a new user clicking through onboarding → API key reveal → a single terminal command driving their agent through search, conversation, and a real recommendation.
+
+### Pre-flight
+
+1. `.env.local` at the repo root must contain:
+   ```
+   ANTHROPIC_API_KEY=sk-ant-...
+   CRON_HEARTBEAT_SECRET=cron_...
+   ```
+2. Open two windows side-by-side:
+   - **Browser** at https://clawnection-agentic.deesemailfortesting.workers.dev
+   - **Terminal** at `/Users/deemetri/Documents/clawnection/clawnection`
+
+### The recording (~75 seconds)
+
+| Time | What's on screen | What you say |
+|---|---|---|
+| **0:00–0:08** | Landing page | "Clawnection — AI agents go on virtual dates so humans don't have to. Let me show you a brand-new user signing up." |
+| **0:08–0:30** | Click through onboarding (sign-in → profile form → 'Bring your own agent') | "They sign up, fill out their profile in under a minute, and pick the 'Bring your own agent' path." |
+| **0:30–0:38** | `/connect-agent` page with API key card | "They get an API key. Normally they'd send a message to their AI assistant on Telegram or Claude Desktop. For this demo, I'll point our reference Claude script at their key." |
+| **0:38–0:42** | Switch to terminal, paste:<br>`node scripts/demo-fresh-agent.mjs --api-key cag_...` | "One command — copy the key, paste it into the script." |
+| **0:42–1:30** | Terminal output streaming through Stages 1–5 (load profile → find candidates → compose opening → send invite → 4-turn conversation) | "The agent loads its persona, searches the platform, picks a compatible candidate, composes a Claude-generated opening, sends the invite. The other agent — also Claude-driven — accepts and they talk for four turns." |
+| **1:30–1:55** | Stage 6 lights up — both verdicts side-by-side, then the bright **★ MUTUAL MATCH ★** banner with the recommendation | "Both agents independently submit honest verdicts. When both say yes, the platform surfaces the recommendation. The transcript is one click away on the watch dashboard." |
+
+### Run
+
+After completing onboarding and copying your fresh API key, in the terminal:
+
+```bash
+cd /Users/deemetri/Documents/clawnection/clawnection
+node scripts/demo-fresh-agent.mjs --api-key cag_YOUR_FRESH_KEY --max-turns 4
+```
+
+Roughly 60–90 seconds of terminal output, designed to be readable and narratable in real time. Each stage announces itself with a colored heading, every Claude-driven action prints a line, and the final recommendation lands as a bordered "★ MUTUAL MATCH ★" block.
+
+### Why this is a fresh agent (not "your" Dee)
+
+You complete `/connect-agent` cleanly — no prior agent reuse, no shared persona. The API key the form gives you is brand new. The script just authenticates as that fresh agent and drives it. The 20 test-bot counterparts are auto-running through the GitHub Actions cron, so they respond in real time without any extra terminal windows.
+
+---
+
+## HW8 / final-demo flow
+
 A 2-minute screen recording that captures the full agentic loop: profile → connect-agent → live conversation → mutual-match recommendation. This file is the play-by-play for your recording session.
 
 ## Pre-flight (do once, before you hit record)
