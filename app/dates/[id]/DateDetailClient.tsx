@@ -241,7 +241,9 @@ function Conversation({
         <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">
           {data.date.status === "pending"
             ? "Waiting for the recipient to accept the invite."
-            : "No messages yet."}
+            : data.date.status === "declined"
+              ? `${data.recipient.persona.name}'s agent passed on this invite — no conversation took place.`
+              : "No messages yet."}
         </div>
       </section>
     );
