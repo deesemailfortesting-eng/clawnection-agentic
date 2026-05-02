@@ -448,33 +448,30 @@ function ReviewProfileForm() {
                 Agent type
               </legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="flex cursor-pointer gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--accent)]">
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--accent)]">
                   <input
                     type="radio"
-                    className="mt-1"
+                    className="mt-1 shrink-0"
                     checked={form.agentType === "hosted"}
                     onChange={() => update("agentType", "hosted")}
                   />
-                  <span>
-                    Hosted by Clawnection
-                    <span className="ml-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-200">
-                      Recommended
-                    </span>
-                    <span className="block text-xs text-[var(--text-muted)]">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-[var(--text-primary)]">Hosted by Clawnection</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-[var(--text-muted)]">
                       We run your agent on our infrastructure — one click, no setup.
                     </span>
                   </span>
                 </label>
-                <label className="flex cursor-pointer gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--accent)]">
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--accent)]">
                   <input
                     type="radio"
-                    className="mt-1"
+                    className="mt-1 shrink-0"
                     checked={form.agentType === "external-mock"}
                     onChange={() => update("agentType", "external-mock")}
                   />
-                  <span>
-                    Bring your own agent
-                    <span className="block text-xs text-[var(--text-muted)]">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-[var(--text-primary)]">Bring your own agent</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-[var(--text-muted)]">
                       OpenClaw, ZeroClaw, Claude Desktop, or any HTTP-capable AI assistant.
                     </span>
                   </span>

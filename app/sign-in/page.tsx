@@ -34,7 +34,7 @@ export default function SignInPage() {
                 Secure sign in
               </p>
               <h1 id="signin-title" className="text-4xl font-black leading-tight tracking-[-0.04em]">
-                Get back to your radar.
+                Get back in the game.
               </h1>
               <p className="max-w-sm text-base leading-7 text-white/68">
                 Sign in to continue building your dating agent, reviewing matches,
