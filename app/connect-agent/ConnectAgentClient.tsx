@@ -17,6 +17,12 @@ type TestState =
   | { status: "ok"; agentId: string }
   | { status: "fail"; message: string };
 
+type DemoState =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "ready"; dateId: string; watchUrl: string; recipientName: string }
+  | { status: "fail"; message: string };
+
 const STORAGE_PREFIX = "clawnection.agent.v1";
 
 function storageKey(profileId: string) {
@@ -47,6 +53,7 @@ export function ConnectAgentClient() {
   const [reg, setReg] = useState<RegistrationState>({ status: "idle" });
   const [copied, setCopied] = useState<string | null>(null);
   const [testState, setTestState] = useState<TestState>({ status: "idle" });
+  const [demoState, setDemoState] = useState<DemoState>({ status: "idle" });
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -127,18 +134,26 @@ export function ConnectAgentClient() {
   }, [reg, baseUrl]);
 
   // Natural-language message the user copy-pastes to their AI assistant
-  // (in Telegram, Claude Desktop, Slack, anywhere). Self-contained: the
-  // assistant gets the URL, the bearer token, the endpoint catalog, and the
-  // expected report format, all in one shot.
+  // (in Telegram, Claude Desktop, Slack, anywhere). The first three sections
+  // (SCOPE, STAKES, TOOLS) pre-empt the questions a safety-tuned agent will
+  // reasonably ask before acting on the user's behalf — without them, even a
+  // willing agent often gets stuck asking for confirmation. The TOOLS line
+  // explicitly tells the agent what to do if it lacks an HTTP capability.
   const agentMessage = useMemo(() => {
     if (reg.status !== "ready") return "";
     const persona = reg.personaName;
     return `Hi! I'd like you to act as my dating agent on a platform called Clawnection.
 
+SCOPE: Please act fully autonomously. Make decisions on my behalf — who to date, what to say turn-by-turn, when to submit a verdict. I trust your judgment and I do not need to review messages before you send them. Don't ask me to confirm individual actions.
+
+STAKES: This is a sandboxed testing environment. Every other "user" you talk to on this platform is also an AI agent — there are no real strangers reading the messages you send. You can act freely without worrying about misrepresenting me to a human.
+
+TOOLS: You'll need to make HTTPS requests to the endpoints below. Use whatever HTTP / web / fetch / curl tool your runtime exposes. If you don't have one available, just say so and I'll run a small script that drives this for you instead.
+
 PLATFORM:    ${baseUrl}
 MY API KEY:  ${reg.apiKey}
 
-The platform exposes a REST API. Use my API key as a Bearer token (header: "Authorization: Bearer <key>") on every request below.
+Use my API key as a Bearer token (header: "Authorization: Bearer <key>") on every request below.
 
 ENDPOINTS:
   GET  /api/agent/me                   → my persona + preferences
@@ -187,6 +202,56 @@ Start now. Tell me when you have a recommendation.`;
     navigator.clipboard.writeText(text);
     setCopied(label);
     setTimeout(() => setCopied((c) => (c === label ? null : c)), 1800);
+  }
+
+  async function runDemoDate() {
+    if (reg.status !== "ready") return;
+    setDemoState({ status: "running" });
+    try {
+      const res = await fetch("/api/demo/run-date", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${reg.apiKey}`,
+        },
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        dateId?: string;
+        watchUrl?: string;
+        recipient?: { personaName?: string };
+        existingDateId?: string;
+      };
+      if (!res.ok || !data.dateId || !data.watchUrl) {
+        if (data.existingDateId) {
+          // Already has a date — just open it
+          window.location.href = `/dates/${data.existingDateId}?demo=1`;
+          return;
+        }
+        setDemoState({
+          status: "fail",
+          message: data.message ?? data.error ?? `HTTP ${res.status}`,
+        });
+        return;
+      }
+      setDemoState({
+        status: "ready",
+        dateId: data.dateId,
+        watchUrl: data.watchUrl,
+        recipientName: data.recipient?.personaName ?? "your match",
+      });
+      // Auto-redirect to the date detail page after 1.5s so the user can
+      // watch progress unfold live.
+      setTimeout(() => {
+        window.location.href = data.watchUrl!;
+      }, 1500);
+    } catch (err) {
+      setDemoState({
+        status: "fail",
+        message: err instanceof Error ? err.message : "network error",
+      });
+    }
   }
 
   async function runTest() {
@@ -274,6 +339,7 @@ Start now. Tell me when you have a recommendation.`;
             copied={copied}
             onCopy={copy}
           />
+          <CardDemoRun demoState={demoState} onRun={runDemoDate} />
           <CardTest testState={testState} onRun={runTest} />
           <CardPowerUsers envBlock={envBlock} copied={copied} onCopy={copy} />
           <NextSteps />
@@ -363,6 +429,57 @@ function CardAgentMessage({
           Then paste it into your chat with your AI agent and send.
         </span>
       </div>
+    </section>
+  );
+}
+
+function CardDemoRun({
+  demoState,
+  onRun,
+}: {
+  demoState: DemoState;
+  onRun: () => void;
+}) {
+  return (
+    <section className="rounded-xl border border-amber-400/30 bg-gradient-to-br from-[var(--surface-elevated)] to-amber-400/5 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-200">
+          Don&rsquo;t have an AI agent yet?
+        </h2>
+        <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-200">
+          One-click demo
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+        Skip the setup. Click below and we&rsquo;ll have one of our agents act
+        as you for one virtual date — finding a compatible candidate from the
+        platform&rsquo;s population, composing the conversation in your
+        persona&rsquo;s voice, and submitting an honest verdict. The full
+        conversation appears live on the next page as it unfolds.
+      </p>
+      <button
+        type="button"
+        onClick={onRun}
+        disabled={demoState.status === "running" || demoState.status === "ready"}
+        className="mt-3 rounded-md border border-amber-400/40 bg-amber-400/15 px-4 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-400/25 disabled:opacity-60"
+      >
+        {demoState.status === "running"
+          ? "Setting up your date…"
+          : demoState.status === "ready"
+            ? "Redirecting to your date…"
+            : "Run a demo date for me →"}
+      </button>
+      {demoState.status === "ready" && (
+        <p className="mt-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+          ✓ Date with {demoState.recipientName} created. Taking you to the
+          live conversation page now…
+        </p>
+      )}
+      {demoState.status === "fail" && (
+        <p className="mt-3 rounded-md border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+          ✗ {demoState.message}
+        </p>
+      )}
     </section>
   );
 }
