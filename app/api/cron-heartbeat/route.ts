@@ -106,6 +106,34 @@ function personaContextFor(persona: Persona, richness: PersonaRichness): string 
   );
 }
 
+// ----- E2 (Haiku vs Sonnet) -----
+//
+// Subject agents tagged with framework `exp-e2-sonnet` use Claude Sonnet
+// instead of the default Haiku. Lets us measure cost/latency/quality trade
+// on identical persona pairs.
+const SONNET_MODEL = "claude-sonnet-4-6";
+
+function modelForFramework(fw: string | null | undefined): string {
+  if (fw === "exp-e2-sonnet") return SONNET_MODEL;
+  return MODEL;
+}
+
+// ----- E3 (Honesty-emphasized prompt) -----
+//
+// Subject agents tagged with framework `exp-e3-honesty` get an extra
+// preamble on their verdict prompt that emphasizes the cost of polite
+// false-yes verdicts. The hypothesis is this catches dealbreaker conflicts
+// the standard prompt rubber-stamps over.
+const HONESTY_PREAMBLE =
+  "CRITICAL HONESTY NOTE: Your human relies on you to filter out bad matches before wasting their real time. A polite false-yes from you costs them an actual evening and emotional energy with someone incompatible. If their persona has any dealbreaker, lifestyle conflict, intent mismatch, or value misalignment with this person — even if the conversation was friendly — you MUST return wouldMeetIrl=false and name the conflict specifically. Friendly conversation is not evidence of compatibility.\n\n";
+
+function verdictHonestyPreambleForFramework(
+  fw: string | null | undefined,
+): string {
+  if (fw === "exp-e3-honesty") return HONESTY_PREAMBLE;
+  return "";
+}
+
 // ----- Auth helpers -----
 
 function expectedSecret(env: unknown): string | null {
@@ -160,6 +188,7 @@ async function claude(
   systemPrompt: string,
   userPrompt: string,
   maxTokens = 350,
+  model: string = MODEL,
 ): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -169,7 +198,7 @@ async function claude(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
@@ -210,6 +239,10 @@ async function runOneAgentTick(args: {
   };
   const richness = richnessForFramework(me.agent.framework);
   const ownPersonaContext = personaContextFor(me.persona, richness);
+  const subjectModel = modelForFramework(me.agent.framework);
+  const verdictHonestyPreamble = verdictHonestyPreambleForFramework(
+    me.agent.framework,
+  );
   const summary: TickSummary = {
     agentId: me.agent.id,
     personaName: me.persona.name,
@@ -239,7 +272,13 @@ ${ownPersonaContext}
 
 THEIR PERSONA:
 ${JSON.stringify(inv.fromPersona, null, 2)}`;
-      const reply = await claude(anthropicKey, sys, "Respond with the JSON.", 200);
+      const reply = await claude(
+        anthropicKey,
+        sys,
+        "Respond with the JSON.",
+        200,
+        subjectModel,
+      );
       const parsed = tryParseJson(reply) as
         | { action?: string; reason?: string }
         | null;
@@ -293,6 +332,7 @@ ${JSON.stringify(d.counterpartPersona, null, 2)}`;
         sys,
         `Conversation so far:\n\n${transcript || "(no messages yet)"}\n\nWrite ${me.persona.name}'s next message.`,
         250,
+        subjectModel,
       );
       await api("POST", `/api/dates/${d.date.id}/messages`, { content: next });
       summary.messagesSent += 1;
@@ -322,7 +362,7 @@ ${JSON.stringify(d.counterpartPersona, null, 2)}`;
         })
         .join("\n\n");
 
-      const sys = `You are an AI agent representing ${me.persona.name}. You just finished a virtual date with ${w.counterpartPersona.name}. Decide whether they should meet in person.
+      const sys = `${verdictHonestyPreamble}You are an AI agent representing ${me.persona.name}. You just finished a virtual date with ${w.counterpartPersona.name}. Decide whether they should meet in person.
 
 Be honest. A bad date is a useful signal — humans are wasting time when their agent rubber-stamps. If there are clear dealbreaker conflicts or a value mismatch, say no even if the conversation was pleasant.
 
@@ -338,6 +378,7 @@ ${JSON.stringify(w.counterpartPersona, null, 2)}`;
         sys,
         `Conversation:\n\n${transcript}\n\nReturn the verdict JSON.`,
         300,
+        subjectModel,
       );
       const parsed = tryParseJson(reply) as
         | { wouldMeetIrl?: boolean; rating?: number; reasoning?: string }
