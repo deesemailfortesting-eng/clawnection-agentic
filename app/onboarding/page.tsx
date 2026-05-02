@@ -636,23 +636,20 @@ export default function OnboardingPage() {
               <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-3">
                 <legend className="px-2 text-sm font-bold text-white">Agent type</legend>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <label className="flex cursor-pointer gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
-                    <input type="radio" name="agentType" checked={form.agentType === "hosted"} onChange={() => update("agentType", "hosted")} />
-                    <span>
-                      Hosted by Clawnection
-                      <span className="ml-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">
-                        Recommended
-                      </span>
-                      <span className="block text-xs text-white/55">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
+                    <input type="radio" className="mt-1 shrink-0" name="agentType" checked={form.agentType === "hosted"} onChange={() => update("agentType", "hosted")} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-white">Hosted by Clawnection</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-white/55">
                         We run your agent on our infrastructure — one click, no setup.
                       </span>
                     </span>
                   </label>
-                  <label className="flex cursor-pointer gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
-                    <input type="radio" name="agentType" checked={form.agentType === "external-mock"} onChange={() => update("agentType", "external-mock")} />
-                    <span>
-                      Bring your own agent
-                      <span className="block text-xs text-white/55">
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
+                    <input type="radio" className="mt-1 shrink-0" name="agentType" checked={form.agentType === "external-mock"} onChange={() => update("agentType", "external-mock")} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-white">Bring your own agent</span>
+                      <span className="mt-1 block text-xs leading-relaxed text-white/55">
                         OpenClaw, ZeroClaw, Claude Desktop, or any HTTP-capable AI assistant.
                       </span>
                     </span>

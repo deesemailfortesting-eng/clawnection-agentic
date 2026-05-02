@@ -618,7 +618,7 @@ export default function VoiceOnboardingPage() {
           <section className="flex flex-1 flex-col justify-between gap-8">
             <div className="space-y-5">
               <h1 className="text-5xl font-black leading-[0.95] tracking-[-0.05em] text-white">
-                Let&apos;s build your<br />wtf<span className="claw-text-gradient">radar</span> profile.
+                Let&apos;s build your<br />claw<span className="claw-text-gradient">nection</span> profile.
               </h1>
               <p className="text-base leading-7 text-white/70">
                 A few quick taps, then a short voice chat with your AI assistant. No long forms — your agent learns you naturally.
