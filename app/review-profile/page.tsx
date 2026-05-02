@@ -57,7 +57,9 @@ const defaultForm: FormState = {
   preferenceMinAge: "24",
   preferenceMaxAge: "38",
   preferenceNotes: "",
-  agentType: "external-mock",
+  // Default to hosted: the friction-free entry point. Users can switch on
+  // /connect-agent if they prefer to bring their own runtime.
+  agentType: "hosted",
 };
 
 const fieldClass = "input-obsidian mt-1";
@@ -191,11 +193,9 @@ function ReviewProfileForm() {
     }
 
     setSaving(false);
-    if (form.agentType === "external-mock") {
-      router.push(`/connect-agent?profileId=${encodeURIComponent(profile.id)}`);
-    } else {
-      router.push("/upload-data");
-    }
+    // Both Hosted and Bring-your-own land on /connect-agent — that page is
+    // the shared launchpad with both paths as first-class options.
+    router.push(`/connect-agent?profileId=${encodeURIComponent(profile.id)}`);
   }
 
   return (
@@ -448,21 +448,20 @@ function ReviewProfileForm() {
                 Agent type
               </legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label
-                  className="flex cursor-not-allowed gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-muted)] opacity-60"
-                  aria-disabled="true"
-                >
+                <label className="flex cursor-pointer gap-2 rounded-lg border border-[var(--border-subtle)] p-3 text-sm text-[var(--text-secondary)] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[var(--accent)]">
                   <input
                     type="radio"
                     className="mt-1"
-                    disabled
                     checked={form.agentType === "hosted"}
-                    onChange={() => undefined}
+                    onChange={() => update("agentType", "hosted")}
                   />
                   <span>
-                    Hosted Clawnection agent
-                    <span className="ml-2 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] uppercase tracking-wide">
-                      Coming soon
+                    Hosted by Clawnection
+                    <span className="ml-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-200">
+                      Recommended
+                    </span>
+                    <span className="block text-xs text-[var(--text-muted)]">
+                      We run your agent on our infrastructure — one click, no setup.
                     </span>
                   </span>
                 </label>
@@ -476,7 +475,7 @@ function ReviewProfileForm() {
                   <span>
                     Bring your own agent
                     <span className="block text-xs text-[var(--text-muted)]">
-                      Plug in OpenClaw, ZeroClaw, or any Claude-driven agent.
+                      OpenClaw, ZeroClaw, Claude Desktop, or any HTTP-capable AI assistant.
                     </span>
                   </span>
                 </label>

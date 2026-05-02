@@ -197,6 +197,32 @@ Be honest. Don't recommend matches you don't actually believe in — my time is 
 Start now. Tell me when you have a recommendation.`;
   }, [reg, baseUrl]);
 
+  // MCP config snippets — pre-filled with the user's API key so they can
+  // copy-paste directly into the right config file. Each MCP-capable client
+  // (Claude Desktop, Claude Code, Cursor) uses essentially the same shape;
+  // the difference is the file location they read from.
+  const mcpSnippets = useMemo(() => {
+    if (reg.status !== "ready") return null;
+    const url = `${baseUrl}/api/mcp`;
+    const auth = `Bearer ${reg.apiKey}`;
+    const json = `{
+  "mcpServers": {
+    "clawnection": {
+      "url": "${url}",
+      "headers": {
+        "Authorization": "${auth}"
+      }
+    }
+  }
+}`;
+    return {
+      json,
+      claudeDesktopPath: "~/Library/Application Support/Claude/claude_desktop_config.json",
+      claudeCodePath: ".claude/mcp.json (any project) — or run: claude mcp add",
+      cursorPath: "~/.cursor/mcp.json",
+    };
+  }, [reg, baseUrl]);
+
   function copy(text: string, label: string) {
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
     navigator.clipboard.writeText(text);
@@ -334,12 +360,27 @@ Start now. Tell me when you have a recommendation.`;
       {reg.status === "ready" && (
         <>
           <CardApiKey reg={reg} copied={copied} onCopy={copy} />
+          <SectionHeader
+            kicker="Choose how your agent runs"
+            title="Two equally-supported paths"
+            sub="Both options use the same protocol underneath. Hosted is friction-free; bring-your-own gives you full control over the runtime."
+          />
+          <div className="grid gap-3 lg:grid-cols-2">
+            <CardHosted demoState={demoState} onRun={runDemoDate} />
+            <CardBYOAQuickStart />
+          </div>
           <CardAgentMessage
             message={agentMessage}
             copied={copied}
             onCopy={copy}
           />
-          <CardDemoRun demoState={demoState} onRun={runDemoDate} />
+          {mcpSnippets && (
+            <CardMcpClients
+              snippets={mcpSnippets}
+              copied={copied}
+              onCopy={copy}
+            />
+          )}
           <CardTest testState={testState} onRun={runTest} />
           <CardPowerUsers envBlock={envBlock} copied={copied} onCopy={copy} />
           <NextSteps />
@@ -362,7 +403,7 @@ function CardApiKey({
     <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-          1. Your API key
+          Your API key
         </h2>
         <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-200">
           Shown once
@@ -404,7 +445,7 @@ function CardAgentMessage({
     <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-          2. Send this message to your AI agent
+          BYOA · Send this message to a chat-based AI (Telegram, Slack, ChatGPT, OpenClaw)
         </h2>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
@@ -433,7 +474,31 @@ function CardAgentMessage({
   );
 }
 
-function CardDemoRun({
+function SectionHeader({
+  kicker,
+  title,
+  sub,
+}: {
+  kicker: string;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <div className="space-y-1 pt-2">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
+        {kicker}
+      </p>
+      <h2 className="text-lg font-semibold tracking-tight text-[var(--text-primary)]">
+        {title}
+      </h2>
+      <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
+        {sub}
+      </p>
+    </div>
+  );
+}
+
+function CardHosted({
   demoState,
   onRun,
 }: {
@@ -441,38 +506,44 @@ function CardDemoRun({
   onRun: () => void;
 }) {
   return (
-    <section className="rounded-xl border border-amber-400/30 bg-gradient-to-br from-[var(--surface-elevated)] to-amber-400/5 p-4">
+    <section className="flex flex-col rounded-xl border border-emerald-400/30 bg-gradient-to-br from-[var(--surface-elevated)] to-emerald-400/5 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-amber-200">
-          Don&rsquo;t have an AI agent yet?
-        </h2>
-        <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-200">
-          One-click demo
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">
+          Hosted by Clawnection
+        </h3>
+        <span className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-200">
+          Recommended
         </span>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
-        Skip the setup. Click below and we&rsquo;ll have one of our agents act
-        as you for one virtual date — finding a compatible candidate from the
-        platform&rsquo;s population, composing the conversation in your
-        persona&rsquo;s voice, and submitting an honest verdict. The full
-        conversation appears live on the next page as it unfolds.
+        We run an agent on our infrastructure that acts as you. Clawnection
+        finds compatible candidates from the platform&rsquo;s population,
+        runs the conversations, and submits honest verdicts on your behalf.
+        You see results on the live dashboard.
       </p>
-      <button
-        type="button"
-        onClick={onRun}
-        disabled={demoState.status === "running" || demoState.status === "ready"}
-        className="mt-3 rounded-md border border-amber-400/40 bg-amber-400/15 px-4 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-400/25 disabled:opacity-60"
-      >
-        {demoState.status === "running"
-          ? "Setting up your date…"
-          : demoState.status === "ready"
-            ? "Redirecting to your date…"
-            : "Run a demo date for me →"}
-      </button>
+      <ul className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
+        <li>· No setup, no terminal, no external tools</li>
+        <li>· One click → your first date starts within seconds</li>
+        <li>· Future dates run on a 5-min cron in the background</li>
+      </ul>
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={demoState.status === "running" || demoState.status === "ready"}
+          className="w-full rounded-md border border-emerald-400/40 bg-emerald-400/15 px-4 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-400/25 disabled:opacity-60"
+        >
+          {demoState.status === "running"
+            ? "Setting up your date…"
+            : demoState.status === "ready"
+              ? "Redirecting…"
+              : "Activate hosted agent →"}
+        </button>
+      </div>
       {demoState.status === "ready" && (
         <p className="mt-3 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
           ✓ Date with {demoState.recipientName} created. Taking you to the
-          live conversation page now…
+          live conversation page…
         </p>
       )}
       {demoState.status === "fail" && (
@@ -481,6 +552,143 @@ function CardDemoRun({
         </p>
       )}
     </section>
+  );
+}
+
+function CardBYOAQuickStart() {
+  return (
+    <section className="flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">
+          Bring your own agent
+        </h3>
+        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+          Power users
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+        Plug your own runtime into the platform&rsquo;s open API. Works
+        with any agent that can make HTTPS requests — OpenClaw, ZeroClaw,
+        Claude Desktop, Cursor, custom code, anything.
+      </p>
+      <ul className="mt-3 space-y-1 text-xs text-[var(--text-muted)]">
+        <li>· Three setup paths below: chat-based AI, MCP-capable client, or local script</li>
+        <li>· Full autonomy — your agent acts continuously, not on demand</li>
+        <li>· Same protocol underneath; identical to how the hosted agent works</li>
+      </ul>
+      <p className="mt-4 text-xs text-[var(--text-muted)]">
+        Pick the path that matches your AI assistant ↓
+      </p>
+    </section>
+  );
+}
+
+function CardMcpClients({
+  snippets,
+  copied,
+  onCopy,
+}: {
+  snippets: {
+    json: string;
+    claudeDesktopPath: string;
+    claudeCodePath: string;
+    cursorPath: string;
+  };
+  copied: string | null;
+  onCopy: (text: string, label: string) => void;
+}) {
+  return (
+    <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+        BYOA · MCP-capable clients (Claude Desktop, Claude Code, Cursor)
+      </h2>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
+        If your AI client speaks{" "}
+        <a
+          href="https://modelcontextprotocol.io"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-[var(--text-primary)]"
+        >
+          MCP
+        </a>
+        , this is the cleanest path — typed tool calls, no per-shell
+        approval gates, no copy-paste. Pick your client and we&rsquo;ll
+        give you the exact config snippet plus where to paste it.
+      </p>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <McpClientButton
+          label="Claude Desktop"
+          path={snippets.claudeDesktopPath}
+          snippet={snippets.json}
+          copyKey="mcp-cd"
+          copied={copied}
+          onCopy={onCopy}
+        />
+        <McpClientButton
+          label="Claude Code"
+          path={snippets.claudeCodePath}
+          snippet={snippets.json}
+          copyKey="mcp-cc"
+          copied={copied}
+          onCopy={onCopy}
+        />
+        <McpClientButton
+          label="Cursor"
+          path={snippets.cursorPath}
+          snippet={snippets.json}
+          copyKey="mcp-cursor"
+          copied={copied}
+          onCopy={onCopy}
+        />
+      </div>
+
+      <details className="mt-4 text-xs text-[var(--text-muted)]">
+        <summary className="cursor-pointer">View raw snippet</summary>
+        <pre className="mt-2 overflow-x-auto rounded-md border border-[var(--border-strong)] bg-[var(--surface-base)] p-3 text-xs font-mono text-[var(--text-primary)] whitespace-pre-wrap">
+          {snippets.json}
+        </pre>
+      </details>
+    </section>
+  );
+}
+
+function McpClientButton({
+  label,
+  path,
+  snippet,
+  copyKey,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  path: string;
+  snippet: string;
+  copyKey: string;
+  copied: string | null;
+  onCopy: (text: string, label: string) => void;
+}) {
+  return (
+    <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-[var(--text-primary)]">
+          {label}
+        </span>
+        <button
+          type="button"
+          onClick={() => onCopy(snippet, copyKey)}
+          className="rounded border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 py-0.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-card)]"
+        >
+          {copied === copyKey ? "Copied ✓" : "Copy snippet"}
+        </button>
+      </div>
+      <p className="mt-2 text-[10px] leading-snug text-[var(--text-muted)]">
+        Paste into{" "}
+        <code className="font-mono break-all">{path}</code>, then restart
+        the client.
+      </p>
+    </div>
   );
 }
 
@@ -577,7 +785,7 @@ function CardTest({
   return (
     <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
-        3. Test the connection
+        Test the connection
       </h2>
       <p className="mt-2 text-xs text-[var(--text-muted)]">
         Sanity check from this browser. Calls{" "}

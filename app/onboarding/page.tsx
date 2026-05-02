@@ -126,7 +126,9 @@ const defaultForm: FormState = {
   partnerPriorities: [],
   preferredDynamic: "balanced",
   preferenceNotes: "",
-  agentType: "external-mock",
+  // Default to hosted: the friction-free entry point. Users can switch to
+  // bring-your-own from the /connect-agent page if they prefer.
+  agentType: "hosted",
 };
 
 function parseCsv(input: string): string[] {
@@ -349,11 +351,10 @@ export default function OnboardingPage() {
 
     saveProfile(profile);
     syncProfileToServer(profile);
-    if (form.agentType === "external-mock") {
-      router.push(`/connect-agent?profileId=${encodeURIComponent(profile.id)}`);
-    } else {
-      router.push(`/demo?profileId=${encodeURIComponent(profile.id)}`);
-    }
+    // Both agent-type choices land on /connect-agent — that page is now the
+    // shared launchpad, with both Hosted and Bring-your-own as first-class
+    // paths the user can choose between (or change their mind).
+    router.push(`/connect-agent?profileId=${encodeURIComponent(profile.id)}`);
   }
 
   return (
@@ -635,15 +636,15 @@ export default function OnboardingPage() {
               <fieldset className="sm:col-span-2 rounded-[24px] border border-white/12 p-3">
                 <legend className="px-2 text-sm font-bold text-white">Agent type</legend>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <label
-                    className="flex cursor-not-allowed gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/40 opacity-60"
-                    aria-disabled="true"
-                  >
-                    <input type="radio" name="agentType" disabled checked={form.agentType === "hosted"} onChange={() => undefined} />
+                  <label className="flex cursor-pointer gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-3 text-sm text-white/76">
+                    <input type="radio" name="agentType" checked={form.agentType === "hosted"} onChange={() => update("agentType", "hosted")} />
                     <span>
-                      Hosted Clawnection agent
-                      <span className="ml-2 rounded-full border border-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                        Coming soon
+                      Hosted by Clawnection
+                      <span className="ml-2 rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">
+                        Recommended
+                      </span>
+                      <span className="block text-xs text-white/55">
+                        We run your agent on our infrastructure — one click, no setup.
                       </span>
                     </span>
                   </label>
@@ -652,7 +653,7 @@ export default function OnboardingPage() {
                     <span>
                       Bring your own agent
                       <span className="block text-xs text-white/55">
-                        Plug in OpenClaw, ZeroClaw, or any Claude-driven agent.
+                        OpenClaw, ZeroClaw, Claude Desktop, or any HTTP-capable AI assistant.
                       </span>
                     </span>
                   </label>
@@ -669,6 +670,8 @@ export default function OnboardingPage() {
           >
             {form.agentType === "external-mock"
               ? "Save profile and connect my agent"
+              : form.agentType === "hosted"
+              ? "Save profile and activate hosted agent"
               : "Save profile and run a virtual date"}
           </button>
         </form>
