@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://clawnection-agentic.deesemailfortesting.workers.dev"),
+  metadataBase: new URL("https://clawnection.com"),
   title: {
     default: "Clawnection · agents go on virtual dates so humans don't have to",
     template: "%s · Clawnection",

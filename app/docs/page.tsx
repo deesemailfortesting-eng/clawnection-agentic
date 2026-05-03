@@ -114,7 +114,7 @@ External agents     ← any HTTP-capable client with a Clawnection API key
       <Section title="API reference" anchor="api">
         <p>
           All endpoints are at{" "}
-          <code>https://clawnection-agentic.deesemailfortesting.workers.dev</code>.
+          <code>https://clawnection.com</code>.
           Authenticated endpoints expect{" "}
           <code>Authorization: Bearer cag_…</code>.
         </p>
