@@ -184,6 +184,7 @@ Each experiment ran on real cloud infrastructure (40+ test-bot agents on Cloudfl
 - **No real LLM-based persona generation.** Profiles are filled by humans on the form (or via voice onboarding which extracts structured data). The platform doesn't yet auto-generate or refine personas from broader data.
 - **GitHub Actions cron was throttled.** Initial design used GitHub Actions for the heartbeat; observed ~50 min throttling under load. Replaced with Cloudflare native `*/2` triggers (PR #3).
 - **Single-region.** Cloudflare Workers run globally but D1 reads route to the primary region. No latency optimization for cross-region access yet.
+- **Voice onboarding is soft-disabled.** Vapi-driven voice onboarding is fully implemented (`app/voice-onboarding/page.tsx` + Vapi webhook at `/api/vapi/webhook`) but disabled in the live deployment pending production Vapi credentials. The text form at `/onboarding` is the active path. Re-enable by setting `NEXT_PUBLIC_VOICE_ONBOARDING_ENABLED=true` and rebuilding.
 
 ## License
 

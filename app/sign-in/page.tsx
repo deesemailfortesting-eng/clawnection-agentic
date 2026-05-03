@@ -4,6 +4,7 @@ import { FormEvent, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PhoneShell } from "@/components/PhoneShell";
+import { ONBOARDING_HREF } from "@/lib/featureFlags";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function SignInPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    router.push("/voice-onboarding");
+    router.push(ONBOARDING_HREF);
   }
 
   return (
@@ -103,7 +104,7 @@ export default function SignInPage() {
               type="button"
               className="apple-sign-in-button"
               aria-label="Sign in with Apple"
-              onClick={() => router.push("/voice-onboarding")}
+              onClick={() => router.push(ONBOARDING_HREF)}
             >
               <svg
                 aria-hidden="true"
