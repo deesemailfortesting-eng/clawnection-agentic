@@ -8,6 +8,7 @@ import { PhoneShell } from "@/components/PhoneShell";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { VoiceOrb } from "@/components/VoiceOrb";
 import { saveProfile, syncProfileToServer } from "@/lib/storage";
+import { VOICE_ONBOARDING_ENABLED } from "@/lib/featureFlags";
 import {
   CommunicationStyle,
   Occupation,
@@ -289,6 +290,65 @@ function formatPhoneDisplay(input: string): string {
 }
 
 export default function VoiceOnboardingPage() {
+  // Soft-disable: when the feature flag is off, render a notice page
+  // instead of the voice flow. The infrastructure below (Vapi integration,
+  // step state machine, transcript handling) is intentionally preserved
+  // so re-enabling is a one-flag flip. To turn voice onboarding back on:
+  //   1. Set NEXT_PUBLIC_VOICE_ONBOARDING_ENABLED=true in .env.local
+  //   2. Wire up a working Vapi production account + webhook
+  //   3. Rebuild
+  if (!VOICE_ONBOARDING_ENABLED) {
+    return <VoiceOnboardingDisabledNotice />;
+  }
+  return <VoiceOnboardingActive />;
+}
+
+function VoiceOnboardingDisabledNotice() {
+  return (
+    <PhoneShell>
+      <main className="flex flex-1 flex-col gap-6 px-5 pt-8 pb-10 text-[var(--text-primary)]">
+        <header className="space-y-3">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+            Voice onboarding
+          </p>
+          <h1 className="text-3xl font-black leading-tight tracking-[-0.04em]">
+            Temporarily disabled.
+          </h1>
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            We&rsquo;re wiring up a production Vapi account before turning
+            this back on. The voice agent that walks you through your
+            persona is built and ready — just not connected to a working
+            voice provider in this deployment.
+          </p>
+        </header>
+
+        <section className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            Use the text form instead
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+            Same persona, same fields, ~2 minutes. You&rsquo;ll be matched
+            with the same agent fleet and end up on the same dashboards.
+          </p>
+          <Link
+            href="/onboarding"
+            className="primary-button mt-4 inline-flex w-full items-center justify-center"
+          >
+            Build your profile →
+          </Link>
+        </section>
+
+        <p className="text-xs leading-5 text-[var(--text-muted)]">
+          Heads-up for developers: the voice flow lives in this same file
+          and is gated behind <code>NEXT_PUBLIC_VOICE_ONBOARDING_ENABLED</code>.
+          Set it to <code>true</code> and rebuild to re-enable locally.
+        </p>
+      </main>
+    </PhoneShell>
+  );
+}
+
+function VoiceOnboardingActive() {
   const router = useRouter();
   const vapiRef = useRef<Vapi | null>(null);
   const callTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

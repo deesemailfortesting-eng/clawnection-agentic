@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PhoneShell } from "@/components/PhoneShell";
+import { ONBOARDING_HREF } from "@/lib/featureFlags";
 
 export default function HomePage() {
   return (
@@ -21,7 +22,7 @@ export default function HomePage() {
           <Link href="/sign-in" className="primary-button w-full">
             Sign up with email
           </Link>
-          <Link href="/voice-onboarding" className="apple-sign-in-button">
+          <Link href={ONBOARDING_HREF} className="apple-sign-in-button">
             <svg
               aria-hidden="true"
               focusable="false"

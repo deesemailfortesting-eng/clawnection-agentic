@@ -298,6 +298,12 @@ External agents     ← any HTTP-capable client with a Clawnection API key
             globally but D1 reads route to the primary region. No
             cross-region latency optimization yet.
           </li>
+          <li>
+            <strong>Voice onboarding is soft-disabled.</strong> Vapi-driven
+            voice onboarding is fully implemented but disabled in the live
+            deployment pending production Vapi credentials. The text form
+            at <code>/onboarding</code> is the active onboarding path.
+          </li>
         </ul>
       </Section>
 

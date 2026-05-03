@@ -5,6 +5,10 @@ import Link from "next/link";
 import { PhoneShell } from "@/components/PhoneShell";
 import { loadProfile } from "@/lib/storage";
 import { VoicePersona } from "@/lib/types/persona";
+import {
+  ONBOARDING_HREF,
+  VOICE_ONBOARDING_ENABLED,
+} from "@/lib/featureFlags";
 
 const MAX_POLLS = 12;
 const POLL_INTERVAL_MS = 5000;
@@ -202,8 +206,8 @@ export default function PersonaPage() {
           <Link href={`/demo${profileId ? `?profileId=${encodeURIComponent(profileId)}` : ""}`} className="primary-button">
             Run a virtual date
           </Link>
-          <Link href="/voice-onboarding" className="secondary-button">
-            Redo voice onboarding
+          <Link href={ONBOARDING_HREF} className="secondary-button">
+            {VOICE_ONBOARDING_ENABLED ? "Redo voice onboarding" : "Edit profile"}
           </Link>
         </div>
       </main>
