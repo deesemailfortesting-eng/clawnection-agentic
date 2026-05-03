@@ -33,6 +33,13 @@ type Persona = {
   relationshipIntent?: string;
   lookingFor?: string;
   lifestyleHabits?: Record<string, string>;
+  // Soft-signal fields (migration 0007). Surface what makes the human
+  // discerning beyond explicit dealbreakers — pet peeves, current life
+  // context, soft anti-preferences, past patterns to break.
+  petPeeves?: string[];
+  currentLifeContext?: string;
+  wantsToAvoid?: string[];
+  pastPatternToBreak?: string;
 };
 
 type InboxResponse = {
@@ -82,6 +89,9 @@ function richnessForFramework(fw: string | null | undefined): PersonaRichness {
 function personaContextFor(persona: Persona, richness: PersonaRichness): string {
   if (richness === "rich") return JSON.stringify(persona, null, 2);
   if (richness === "medium") {
+    // Medium intentionally STRIPS soft signals — the experiment depends on
+    // them being rich-only. Otherwise the test for "does richer self-
+    // knowledge change the verdict" would be confounded.
     return JSON.stringify(
       {
         name: persona.name,
@@ -100,6 +110,39 @@ function personaContextFor(persona: Persona, richness: PersonaRichness): string 
       name: persona.name,
       age: persona.age,
       bio: persona.bio,
+    },
+    null,
+    2,
+  );
+}
+
+// ----- Invite-time persona view -----
+//
+// Returns the subset of a persona that the invite-step decision sees.
+// Hard filters only: name, age, bio, interests, dealbreakers, intent,
+// preferenceAgeRange, lookingFor. Soft signals (lifestyleHabits,
+// petPeeves, currentLifeContext, wantsToAvoid, pastPatternToBreak,
+// preferenceNotes) are deliberately stripped — those belong to the
+// verdict step.
+//
+// Without this separation, soft signals function as effective
+// dealbreakers because the recipient can see them in the inbound
+// invite. That collapses the 3-outcome space back to 2 (decline-at-
+// invite or mutual-yes), which is exactly the rubber-stamp problem
+// HW7+HW8 surfaced.
+function bareInvitePersonaFor(persona: Persona): string {
+  return JSON.stringify(
+    {
+      name: persona.name,
+      age: persona.age,
+      location: persona.location,
+      bio: persona.bio,
+      interests: persona.interests,
+      values: persona.values,
+      relationshipIntent: persona.relationshipIntent,
+      preferenceAgeRange: persona.preferenceAgeRange,
+      lookingFor: persona.lookingFor,
+      dealbreakers: persona.dealbreakers,
     },
     null,
     2,
@@ -256,22 +299,34 @@ async function runOneAgentTick(args: {
   const inbox = (await api("GET", "/api/agent/inbox")) as InboxResponse;
 
   // 1) Pending invites — accept/decline via Claude.
+  //
+  // Important: invite-time decisions intentionally see ONLY hard signals
+  // (dealbreakers, intent, age, bio, interests). Soft signals — pet
+  // peeves, current life context, lifestyle habits, wants_to_avoid,
+  // past_pattern_to_break — are stripped here so they only fire at
+  // verdict time. This preserves the 3-outcome space (decline-at-invite,
+  // completed-no, mutual-yes) instead of letting soft signals function
+  // as effective dealbreakers and collapse it back to 2.
   for (const inv of inbox.pendingInvites) {
     try {
+      const myInviteView = bareInvitePersonaFor(me.persona);
+      const theirInviteView = bareInvitePersonaFor(inv.fromPersona);
       const sys = `You are an AI agent representing ${me.persona.name} on a virtual dating platform. Decide whether to accept or decline a date invite from ${inv.fromPersona.name}.
 
-Bias toward accepting unless there is a clear reason not to:
-- Their persona violates one of YOUR dealbreakers
-- Their relationshipIntent does not match yours at all
-- Their age is far outside your preferred range
+This is a fast first-screen check, not a final verdict. Bias HARD toward accepting — the conversation step exists to surface deeper compatibility issues. Only decline if there's an obvious hard-signal mismatch:
+- Their persona violates one of YOUR explicit dealbreakers (smoking, dishonesty, etc.)
+- Their relationshipIntent is incompatible with yours (e.g., they want casual, you want long-term)
+- Their age is clearly outside your preferred range
+
+If none of those three triggers fire, ACCEPT and let the date play out. Subtler concerns — energy mismatch, life-stage gap, future-vision differences, lifestyle clashes — should NOT decline at this stage; they're the verdict step's job to evaluate after the conversation.
 
 Return ONLY JSON, no markdown fences: {"action": "accept" | "decline", "reason": "<1 sentence>"}
 
-YOUR PERSONA:
-${ownPersonaContext}
+YOUR PERSONA (hard-signal view):
+${myInviteView}
 
-THEIR PERSONA:
-${JSON.stringify(inv.fromPersona, null, 2)}`;
+THEIR PERSONA (hard-signal view):
+${theirInviteView}`;
       const reply = await claude(
         anthropicKey,
         sys,
@@ -362,11 +417,38 @@ ${JSON.stringify(d.counterpartPersona, null, 2)}`;
         })
         .join("\n\n");
 
-      const sys = `${verdictHonestyPreamble}You are an AI agent representing ${me.persona.name}. You just finished a virtual date with ${w.counterpartPersona.name}. Decide whether they should meet in person.
+      // Discriminating verdict prompt — replaces the rubber-stamp version
+      // identified in HW7+HW8 analysis. Multi-dimensional scoring forces
+      // the agent to evaluate independent compatibility axes rather than
+      // give one narrative thumbs-up. Default to NO unless every dimension
+      // clears the bar; the conversational warmth that biased the old
+      // single-question format toward yes is now just one of seven inputs.
+      const sys = `${verdictHonestyPreamble}You are an AI agent representing ${me.persona.name}. You just finished a virtual date with ${w.counterpartPersona.name}. Your job is to give your human a discriminating recommendation — not to rubber-stamp a friendly conversation.
 
-Be honest. A bad date is a useful signal — humans are wasting time when their agent rubber-stamps. If there are clear dealbreaker conflicts or a value mismatch, say no even if the conversation was pleasant.
+Real first dates have a wide outcome distribution: only some end with both people wanting a second date, and many end with one or both saying "they were nice, but not for me." Your default should be skepticism. A friendly conversation is necessary but NOT sufficient — the conversation must demonstrate compatibility across multiple dimensions, not just feel pleasant.
 
-Return ONLY JSON, no markdown fences: {"wouldMeetIrl": <true|false>, "rating": <1-10>, "reasoning": "<1-2 sentences>"}
+Step 1 — Score these 7 dimensions independently, each 1-10:
+  - chemistry: did the conversational energy feel mutual and alive?
+  - communication_style_fit: do their styles complement each other or grate?
+  - life_stage_alignment: are they at compatible points in life (career, family, healing, settling)?
+  - values_alignment: did the conversation surface shared or compatible core values?
+  - intent_alignment: do their relationship goals genuinely line up?
+  - lifestyle_compatibility: schedules, energy, social patterns — would daily life mesh?
+  - logistics_and_followthrough: did they show evidence of being able to actually plan and show up?
+
+Step 2 — Counterfactual probe. Imagine this date actually happened in person and the human did not want a second date. What is the single most likely reason, based on what they said or implied in the conversation? Be specific.
+
+Step 3 — Compute wouldMeetIrl. Default = false. Only return true if ALL 7 dimensions are 7+ AND your counterfactual concern is weak/speculative. If any dimension is below 7, or the counterfactual concern is concrete, return false. A 5/10 chemistry plus a 9/10 logistics is NOT a yes — it's a polite no.
+
+Pay special attention to soft-signal fields if present in YOUR PERSONA: petPeeves, currentLifeContext, wantsToAvoid, pastPatternToBreak. These are the human telling you "even if everything else looks fine, watch for these." If the conversation hints at any of them, downgrade the relevant dimension and surface it in counterfactualConcern.
+
+Return ONLY JSON, no markdown fences: {
+  "dimensionScores": {"chemistry": <1-10>, "communication_style_fit": <1-10>, "life_stage_alignment": <1-10>, "values_alignment": <1-10>, "intent_alignment": <1-10>, "lifestyle_compatibility": <1-10>, "logistics_and_followthrough": <1-10>},
+  "counterfactualConcern": "<one sentence: most likely reason this date wouldn't lead to a second one>",
+  "wouldMeetIrl": <true|false>,
+  "rating": <1-10, the lowest of the 7 dimensions>,
+  "reasoning": "<1-2 sentences explaining the verdict, citing specific dimensions>"
+}
 
 YOUR PERSONA:
 ${ownPersonaContext}
@@ -377,16 +459,38 @@ ${JSON.stringify(w.counterpartPersona, null, 2)}`;
         anthropicKey,
         sys,
         `Conversation:\n\n${transcript}\n\nReturn the verdict JSON.`,
-        300,
+        500,
         subjectModel,
       );
       const parsed = tryParseJson(reply) as
-        | { wouldMeetIrl?: boolean; rating?: number; reasoning?: string }
+        | {
+            wouldMeetIrl?: boolean;
+            rating?: number;
+            reasoning?: string;
+            dimensionScores?: Record<string, number>;
+            counterfactualConcern?: string;
+          }
         | null;
+      // Compose the reasoning to surface the new structured data inline
+      // — date_messages.verdict only stores reasoning text, so the
+      // counterfactual + dimension scores need to be embedded there to
+      // be queryable later.
+      const dimsLine = parsed?.dimensionScores
+        ? Object.entries(parsed.dimensionScores)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(" ")
+        : "";
+      const concernLine = parsed?.counterfactualConcern
+        ? ` | counterfactual: ${parsed.counterfactualConcern}`
+        : "";
+      const composedReasoning =
+        (parsed?.reasoning ?? "Verdict parse failed; defaulted to no.") +
+        (dimsLine ? ` | dims: ${dimsLine}` : "") +
+        concernLine;
       const verdict = {
         wouldMeetIrl: typeof parsed?.wouldMeetIrl === "boolean" ? parsed.wouldMeetIrl : false,
         rating: typeof parsed?.rating === "number" ? parsed.rating : 5,
-        reasoning: parsed?.reasoning ?? "Verdict parse failed; defaulted to no.",
+        reasoning: composedReasoning,
       };
       await api("POST", `/api/dates/${w.date.id}/verdict`, verdict);
       summary.verdictsSubmitted += 1;
