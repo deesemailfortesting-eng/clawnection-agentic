@@ -51,3 +51,8 @@ next-env.d.ts
 
 # Local-only test-agent credentials (created by scripts/seed-test-agents.mjs)
 *.local.json
+
+# Confidential peer-test feedback (HW9). Submitted to the prof, not the
+# tested team — keep out of the public repo to honor the confidentiality
+# framing of the assignment.
+docs/HW9_PEER_TEST_*.md
