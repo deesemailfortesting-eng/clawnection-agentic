@@ -61,6 +61,14 @@ export type RomanticProfile = {
   };
   preferenceNotes: string;
   agentType: AgentType;
+  // Soft-signal fields (added in migration 0007). These capture the
+  // middle band between explicit dealbreakers and broad compatibility
+  // signals — the territory where most real first-date "no" verdicts
+  // live. Optional everywhere so existing personas continue to work.
+  petPeeves?: string[];
+  currentLifeContext?: string;
+  wantsToAvoid?: string[];
+  pastPatternToBreak?: string;
 };
 
 export type VirtualDateRoundType =

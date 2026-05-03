@@ -36,6 +36,14 @@ export function rowToProfile(row: Record<string, unknown>): RomanticProfile {
     },
     preferenceNotes: (row.preference_notes as string | null) ?? "",
     agentType: (row.agent_type as RomanticProfile["agentType"]) ?? "external-mock",
+    // Soft-signal fields (migration 0007). Only undefined when the
+    // column is NULL — empty arrays / strings are returned as-is so
+    // verdict prompts can detect "the user hasn't filled this in" vs
+    // "the user has nothing to say here".
+    petPeeves: row.pet_peeves != null ? safeJsonArray(row.pet_peeves) : undefined,
+    currentLifeContext: (row.current_life_context as string | null) ?? undefined,
+    wantsToAvoid: row.wants_to_avoid != null ? safeJsonArray(row.wants_to_avoid) : undefined,
+    pastPatternToBreak: (row.past_pattern_to_break as string | null) ?? undefined,
   };
 }
 
@@ -53,8 +61,10 @@ export async function upsertProfile(
         relationship_intent, bio, interests, profile_values,
         communication_style, lifestyle_habits, dealbreakers,
         ideal_first_date, preference_age_min, preference_age_max,
-        preference_notes, agent_type, updated_at
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+        preference_notes, agent_type,
+        pet_peeves, current_life_context, wants_to_avoid, past_pattern_to_break,
+        updated_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         last_name = excluded.last_name,
@@ -80,6 +90,10 @@ export async function upsertProfile(
         preference_age_max = excluded.preference_age_max,
         preference_notes = excluded.preference_notes,
         agent_type = excluded.agent_type,
+        pet_peeves = excluded.pet_peeves,
+        current_life_context = excluded.current_life_context,
+        wants_to_avoid = excluded.wants_to_avoid,
+        past_pattern_to_break = excluded.past_pattern_to_break,
         updated_at = datetime('now')`,
     )
     .bind(
@@ -108,6 +122,10 @@ export async function upsertProfile(
       final.preferenceAgeRange.max,
       final.preferenceNotes,
       final.agentType,
+      final.petPeeves !== undefined ? JSON.stringify(final.petPeeves) : null,
+      final.currentLifeContext ?? null,
+      final.wantsToAvoid !== undefined ? JSON.stringify(final.wantsToAvoid) : null,
+      final.pastPatternToBreak ?? null,
     )
     .run();
   return final;
