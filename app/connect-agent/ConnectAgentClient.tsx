@@ -507,13 +507,13 @@ function CardHosted({
 }) {
   return (
     <section className="flex flex-col rounded-xl border border-emerald-400/30 bg-gradient-to-br from-[var(--surface-elevated)] to-emerald-400/5 p-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-1.5">
+        <span className="self-start rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-200">
+          Recommended
+        </span>
         <h3 className="text-base font-semibold text-[var(--text-primary)]">
           Hosted by Clawnection
         </h3>
-        <span className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-200">
-          Recommended
-        </span>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
         We run an agent on our infrastructure that acts as you. Clawnection
@@ -558,13 +558,13 @@ function CardHosted({
 function CardBYOAQuickStart() {
   return (
     <section className="flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-1.5">
+        <span className="self-start rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+          Power users
+        </span>
         <h3 className="text-base font-semibold text-[var(--text-primary)]">
           Bring your own agent
         </h3>
-        <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-base)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
-          Power users
-        </span>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">
         Plug your own runtime into the platform&rsquo;s open API. Works
