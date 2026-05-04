@@ -70,6 +70,18 @@ const CRON_SECRET = process.env.CRON_HEARTBEAT_SECRET;
 
 if (!ANTHROPIC_KEY || !CRON_SECRET) {
   console.error("[demo] missing env keys (ANTHROPIC_API_KEY or CRON_HEARTBEAT_SECRET)");
+  console.error("[demo] both should be in .env.local");
+  process.exit(2);
+}
+// CLOUDFLARE_API_TOKEN is required for the wrangler-based D1 calls that
+// pin agent priority + clean up stale dates. Without it, the script
+// silently falls back to slow-mode (~80s drain) which won't fit a 30-sec
+// video. Fail fast with a clear instruction.
+if (!process.env.CLOUDFLARE_API_TOKEN) {
+  console.error("[demo] missing CLOUDFLARE_API_TOKEN");
+  console.error("[demo] add this line to .env.local then re-run:");
+  console.error("[demo]   CLOUDFLARE_API_TOKEN=cfat_<your-token>");
+  console.error("[demo] without it, the script can't pin agent priority and the date will sit pending forever");
   process.exit(2);
 }
 
